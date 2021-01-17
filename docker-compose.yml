@@ -1,0 +1,8 @@
+version: "3"
+services:
+  avif-converter:
+    environment:
+      - PORT=8080
+    build: .
+    ports:
+      - "8080:8080"
