@@ -24,7 +24,7 @@ logging.basicConfig(format='%(message)s', level=logging.INFO)
 app = Flask(__name__)
 
 
-if GCP_BUCKET:
+if GCP_BUCKET:  # pragma: no cover
     storage_client = storage.Client()
 
 @app.route('/favicon.ico')
@@ -129,7 +129,9 @@ def avif_convert(tempf_in, url_hash=None):
     return response, code
 
 def send_avif(f):
-    return send_file(f, mimetype='image/avif', cache_timeout=CACHE_TIMEOUT)
+    response = send_file(f, mimetype='image/avif', cache_timeout=CACHE_TIMEOUT)
+    response.set_etag(sha256sum(f))
+    return response
 
 def sha256sum(filename):
     h  = sha256()
@@ -140,7 +142,7 @@ def sha256sum(filename):
             h.update(mv[:n])
     return h.hexdigest()
 
-def download_blob(bucket_name, source_blob_name, destination_file_name):
+def download_blob(bucket_name, source_blob_name, destination_file_name):  # pragma: no cover
     """Downloads a blob from the bucket."""
     # bucket_name = "your-bucket-name"
     # source_blob_name = "storage-object-name"
@@ -161,7 +163,7 @@ def download_blob(bucket_name, source_blob_name, destination_file_name):
         )
     )
 
-def upload_blob(bucket_name, source_file_name, destination_blob_name):
+def upload_blob(bucket_name, source_file_name, destination_blob_name):  # pragma: no cover
     """Uploads a file to the bucket."""
     # bucket_name = "your-bucket-name"
     # source_file_name = "local/path/to/file"
@@ -178,5 +180,5 @@ def upload_blob(bucket_name, source_file_name, destination_blob_name):
         )
     )
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))

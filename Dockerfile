@@ -43,11 +43,11 @@ WORKDIR $APP_HOME
 RUN apt-get remove --autoremove --purge -y build-essential libjpeg-dev libpng-dev libssl-dev ninja-build cmake pkg-config git curl \
   && rm -rf /var/lib/apt/lists/* \
   && rm -rf $BUILD_DIR
-RUN pip3 install Flask gunicorn python-magic requests google-cloud-storage
+RUN pip3 install Flask gunicorn python-magic requests google-cloud-storage coverage
 COPY main.py test.py ./
 COPY static/ ./static/
 COPY templates/ ./templates/
-RUN python3 test.py && rm -f test.py
+RUN coverage run --source=./ test.py && coverage report -m && coverage html && mv htmlcov static/
 
 # Run the web service on container startup. Here we use the gunicorn
 # webserver, with one worker process and 8 threads.
