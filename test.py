@@ -10,9 +10,15 @@ TEST_NET_BMP = 'https://www.w3.org/People/mimasa/test/imgformat/img/w3c_home.bmp
 TEST_NET_NOT_IMAGE = 'https://www.google.com/'
 TEST_NET_TOO_BIG = 'https://effigis.com/wp-content/uploads/2015/02/Airbus_Pleiades_50cm_8bit_RGB_Yogyakarta.jpg'
 
+
+# https://docs.python.org/3/library/unittest.mock.html#quick-guide
+# Note: When you nest patch decorators the mocks are passed in to
+# the decorated function in the same order they applied (the normal
+# Python order that decorators are applied). This means from the
+# bottom up, so in the example above the mock for module.ClassName1
+# is passed in first.
+
 @patch('main.GCP_BUCKET', '-testing-')
-@patch('main.upload_blob', side_effect=exceptions.NotFound('Test'))
-@patch('main.download_blob', side_effect=exceptions.NotFound('Test'))
 class SmokeTests(unittest.TestCase):
     def setUp(self):
         self.cache = {}
@@ -31,13 +37,15 @@ class SmokeTests(unittest.TestCase):
         with open(source_file_name, 'rb') as f:
             self.cache[key] = f.read()
 
-    def test_main_page(self, mock_dl, mock_ul):
+    def test_main_page(self):
         response = self.app.get('/')
         self.assertEqual(response.status_code, 200)
         response = self.app.get('/favicon.ico')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/vnd.microsoft.icon')
 
+    @patch('main.upload_blob', side_effect=exceptions.NotFound('Test'))
+    @patch('main.download_blob', side_effect=exceptions.NotFound('Test'))
     def test_api_post(self, mock_dl, mock_ul):
         response = self.app.post('/api', data={'file': open(TEST_LOCAL_JPG, 'rb')})
         self.assertEqual(response.status_code, 200)
@@ -47,6 +55,8 @@ class SmokeTests(unittest.TestCase):
         response = self.app.post('/api', data={'file': open(__file__, 'rb')})
         self.assertEqual(response.status_code, 400)
 
+    @patch('main.upload_blob', side_effect=exceptions.NotFound('Test'))
+    @patch('main.download_blob', side_effect=exceptions.NotFound('Test'))
     def test_api_get(self, mock_dl, mock_ul):
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_NOT_IMAGE)))
         self.assertEqual(response.status_code, 400)
@@ -63,7 +73,7 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
 
-    def test_sha256sum(self, mock_dl, mock_ul):
+    def test_sha256sum(self):
         val1 = sha256sum(TEST_LOCAL_JPG)
         self.assertEqual(len(val1), 64)
         val2 = sha256sum(__file__)
