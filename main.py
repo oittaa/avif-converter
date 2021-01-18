@@ -9,7 +9,7 @@ import time
 from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory
 from google.cloud import storage, exceptions
 from hashlib import sha256
-from tempfile import mkstemp
+from tempfile import NamedTemporaryFile
 
 SUPPORTED_MIMES = ['image/jpeg', 'image/png']
 TITLE = os.environ.get('TITLE', 'AVIF Converter')
@@ -31,16 +31,14 @@ if GCP_BUCKET:  # pragma: no cover
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static'),
                                'favicon.ico', mimetype='image/vnd.microsoft.icon')
-                               
 
 @app.route('/', methods=['GET'])
 def index():
     return render_template('index.html', title=TITLE, url=URL)
 
-
 @app.route('/api', methods=['GET'])
 def api_get():
-    url_hash = response = None
+    url_hash = None
 
     url = request.args.get('url')
     if not isinstance(url, str) or (not url.startswith('https://') and not url.startswith('http://')):
@@ -48,32 +46,31 @@ def api_get():
 
     if GCP_BUCKET:
         url_hash = sha256(url.encode('utf-8')).hexdigest()
-        _, tempf = mkstemp()
-        try:
-            download_blob(GCP_BUCKET, url_hash, tempf)
-            logging.info('Cache hit URL: {}/{}'.format(GCP_BUCKET, url_hash))
-            response = send_avif(tempf)
-        except exceptions.NotFound:
-            logging.info('Cache miss URL: {}/{}'.format(GCP_BUCKET, url_hash))
-        os.remove(tempf)
-        if response:
-            return response
+        with NamedTemporaryFile() as tempf:
+            try:
+                download_blob(GCP_BUCKET, url_hash, tempf.name)
+                logging.info('Cache hit URL: {}/{}'.format(GCP_BUCKET, url_hash))
+                return send_avif(tempf.name)
+            except exceptions.NotFound:
+                logging.info('Cache miss URL: {}/{}'.format(GCP_BUCKET, url_hash))
 
-    r = requests.head(url)
-    content_type = r.headers.get('Content-Type')
-    if not isinstance(content_type, str) or not content_type.startswith('image/'):
+    try:
+        r = requests.head(url)
+        content_type = r.headers.get('Content-Type')
+        if not isinstance(content_type, str) or not content_type.startswith('image/'):
+            abort(400)
+        content_length = r.headers.get('Content-Length')
+        if isinstance(content_length, str) and int(content_length) > GET_MAX_SIZE:
+            abort(406)
+        logging.info('Fetching URL: %s', url)
+        r = requests.get(url)
+    except requests.exceptions.RequestException as e:
         abort(400)
-    content_length = r.headers.get('Content-Length')
-    if isinstance(content_length, str) and int(content_length) > GET_MAX_SIZE:
-        abort(406)
-    logging.info('Fetching URL: %s', url)
-    r = requests.get(url)
     if r.status_code != requests.codes.ok:
         abort(400)
-    _, tempf = mkstemp()
-    with open(tempf, 'wb') as f:
-        f.write(r.content)
-    return avif_convert(tempf, url_hash)
+    with NamedTemporaryFile() as tempf:
+        tempf.write(r.content)
+        return avif_convert(tempf.name, url_hash)
 
 @app.route('/api', methods=['POST'])
 def api_post():
@@ -81,37 +78,38 @@ def api_post():
     if 'file' not in request.files:
         abort(400)
     f = request.files['file']
-    _, tempf = mkstemp()
-    f.save(tempf)
-    return avif_convert(tempf)
+    with NamedTemporaryFile() as tempf:
+        f.save(tempf.name)
+        return avif_convert(tempf.name)
 
 def avif_convert(tempf_in, url_hash=None):
-    _, tempf_out = mkstemp()
-
     logging.info('Input file size: %d', os.path.getsize(tempf_in))
     if GCP_BUCKET:
         data_hash = sha256sum(tempf_in)
-        try:
-            download_blob(GCP_BUCKET, data_hash, tempf_out)
-            logging.info('Cache hit data: {}/{}'.format(GCP_BUCKET, data_hash))
-            if url_hash:
-                upload_blob(GCP_BUCKET, tempf_out, url_hash)
-            response = send_avif(tempf_out)
-            os.remove(tempf_in)
-            os.remove(tempf_out)
-            return response
-        except exceptions.NotFound:
-            logging.info('Cache miss data: {}/{}'.format(GCP_BUCKET, data_hash))
-    mime = magic.from_file(tempf_in, mime=True)
-    if mime not in SUPPORTED_MIMES:
-        result = subprocess.run(['convert', tempf_in+'[0]', 'png:'+tempf_out])
-        if result.returncode == 0:
-            tempf_in, tempf_out = tempf_out, tempf_in
-    start = time.perf_counter()
-    result = subprocess.run(['avifenc', '-j', str(multiprocessing.cpu_count()), tempf_in, tempf_out])
-    logging.info('Encoding time: {:.4f}'.format(time.perf_counter() - start))
-    os.remove(tempf_in)
-    if result.returncode == 0:
+        with NamedTemporaryFile() as tempf:
+            try:
+                download_blob(GCP_BUCKET, data_hash, tempf.name)
+                logging.info('Cache hit data: {}/{}'.format(GCP_BUCKET, data_hash))
+                if url_hash:
+                    upload_blob(GCP_BUCKET, tempf.name, url_hash)
+                return send_avif(tempf.name)
+            except exceptions.NotFound:
+                logging.info('Cache miss data: {}/{}'.format(GCP_BUCKET, data_hash))
+    with NamedTemporaryFile() as tempf:
+        tempf_out = tempf.name
+        mime = magic.from_file(tempf_in, mime=True)
+        if mime not in SUPPORTED_MIMES:
+            result = subprocess.run(['convert', tempf_in+'[0]', 'png:'+tempf_out])
+            if result.returncode == 0:
+                tempf_in, tempf_out = tempf_out, tempf_in
+            else:
+                logging.error('Could not convert {} to PNG'.format(mime))
+        start = time.perf_counter()
+        result = subprocess.run(['avifenc', '-j', str(multiprocessing.cpu_count()), tempf_in, tempf_out])
+        logging.info('Encoding time: {:.4f}'.format(time.perf_counter() - start))
+        if result.returncode != 0:
+            logging.error('avifenc error')
+            abort(400)
         logging.info('Output file size: %d', os.path.getsize(tempf_out))
         if GCP_BUCKET:
             try:
@@ -120,13 +118,7 @@ def avif_convert(tempf_in, url_hash=None):
                     upload_blob(GCP_BUCKET, tempf_out, url_hash)
             except exceptions.NotFound:
                 logging.error('Could not update cache: {}/{}'.format(GCP_BUCKET, data_hash))
-        response = send_avif(tempf_out)
-        code = 200
-    else:
-        response = 'bad request!'
-        code = 400
-    os.remove(tempf_out)
-    return response, code
+        return send_avif(tempf_out)
 
 def send_avif(f):
     response = send_file(f, mimetype='image/avif', cache_timeout=CACHE_TIMEOUT)

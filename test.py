@@ -6,6 +6,8 @@ from main import app, sha256sum
 from unittest.mock import patch
 
 TEST_LOCAL_JPG = 'static/flowers.jpg'
+TEST_LOCAL_GIF = 'static/test.gif'
+TEST_NET_PNG = 'https://www.gstatic.com/webp/gallery3/2.png'
 TEST_NET_BMP = 'https://www.w3.org/People/mimasa/test/imgformat/img/w3c_home.bmp'
 TEST_NET_NOT_IMAGE = 'https://www.google.com/'
 TEST_NET_TOO_BIG = 'https://effigis.com/wp-content/uploads/2015/02/Airbus_Pleiades_50cm_8bit_RGB_Yogyakarta.jpg'
@@ -50,20 +52,16 @@ class SmokeTests(unittest.TestCase):
         response = self.app.post('/api', data={'file': open(TEST_LOCAL_JPG, 'rb')})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
-        response = self.app.post('/api', data={'xx': open(TEST_LOCAL_JPG, 'rb')})
-        self.assertEqual(response.status_code, 400)
-        response = self.app.post('/api', data={'file': open(__file__, 'rb')})
-        self.assertEqual(response.status_code, 400)
+        response = self.app.post('/api', data={'file': open(TEST_LOCAL_GIF, 'rb')})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
 
     @patch('main.upload_blob', side_effect=exceptions.NotFound('Test'))
     @patch('main.download_blob', side_effect=exceptions.NotFound('Test'))
     def test_api_get(self, mock_dl, mock_ul):
-        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_NOT_IMAGE)))
-        self.assertEqual(response.status_code, 400)
-        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_TOO_BIG)))
-        self.assertEqual(response.status_code, 406)
-        response = self.app.get('/api?url=invalid')
-        self.assertEqual(response.status_code, 400)
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_PNG)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
         mock_dl.side_effect = self.download_blob
         mock_ul.side_effect = self.upload_blob
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_BMP)))
@@ -72,6 +70,22 @@ class SmokeTests(unittest.TestCase):
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_BMP)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+
+    @patch('main.upload_blob', side_effect=exceptions.NotFound('Test'))
+    @patch('main.download_blob', side_effect=exceptions.NotFound('Test'))
+    def test_api_invalid_requests(self, mock_dl, mock_ul):
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_NOT_IMAGE)))
+        self.assertEqual(response.status_code, 400)
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_TOO_BIG)))
+        self.assertEqual(response.status_code, 406)
+        response = self.app.get('/api?url=invalid')
+        self.assertEqual(response.status_code, 400)
+        response = self.app.get('/api?url=https%3A//this-address-does-not-exist')
+        self.assertEqual(response.status_code, 400)
+        response = self.app.post('/api', data={'xx': open(TEST_LOCAL_JPG, 'rb')})
+        self.assertEqual(response.status_code, 400)
+        response = self.app.post('/api', data={'file': open(__file__, 'rb')})
+        self.assertEqual(response.status_code, 400)
 
     def test_sha256sum(self):
         val1 = sha256sum(TEST_LOCAL_JPG)

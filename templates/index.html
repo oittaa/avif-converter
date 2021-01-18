@@ -20,7 +20,7 @@
       </div>
       <div class="wrapper">
           <form method="get" action="{{ url_for('api_get') }}">
-             <input autofocus type="url" name="url" id="url" placeholder="https://..."onpaste="delaySubmit(this)">
+             <input autofocus type="url" name="url" id="url" placeholder="https://..." autocomplete="off" onpaste="delaySubmit(this)">
              <input class="btn" type="submit" value="Go">
           </form>
       </div>
