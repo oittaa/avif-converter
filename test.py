@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 TEST_LOCAL_JPG = 'static/flowers.jpg'
 TEST_LOCAL_GIF = 'static/test.gif'
+TEST_NET_JPG = 'https://www.gstatic.com/webp/gallery/5.jpg'
+TEST_NET_JPG_HASH = 'e7273a6e8842280c3e291297f3c6e3f7d94bb4c0993d771341ec5e22532e6411'  # curl -s https://www.gstatic.com/webp/gallery/5.jpg | sha256sum | head -c 64
 TEST_NET_PNG = 'https://www.gstatic.com/webp/gallery3/2.png'
 TEST_NET_BMP = 'https://www.w3.org/People/mimasa/test/imgformat/img/w3c_home.bmp'
 TEST_NET_NOT_IMAGE = 'https://www.google.com/'
@@ -17,8 +19,7 @@ TEST_NET_TOO_BIG = 'https://effigis.com/wp-content/uploads/2015/02/Airbus_Pleiad
 # Note: When you nest patch decorators the mocks are passed in to
 # the decorated function in the same order they applied (the normal
 # Python order that decorators are applied). This means from the
-# bottom up, so in the example above the mock for module.ClassName1
-# is passed in first.
+# bottom up.
 
 @patch('main.GCP_BUCKET', '-testing-')
 class SmokeTests(unittest.TestCase):
@@ -70,6 +71,10 @@ class SmokeTests(unittest.TestCase):
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_BMP)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        self.cache['-testing-'+TEST_NET_JPG_HASH] = 'FAKEDATA'.encode()
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_JPG)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, 'FAKEDATA'.encode())
 
     @patch('main.upload_blob', side_effect=exceptions.NotFound('Test'))
     @patch('main.download_blob', side_effect=exceptions.NotFound('Test'))
