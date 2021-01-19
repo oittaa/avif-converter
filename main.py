@@ -1,6 +1,4 @@
 import logging
-import magic
-import multiprocessing
 import os
 import requests
 import subprocess
@@ -9,14 +7,18 @@ import time
 from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory
 from google.cloud import storage, exceptions
 from hashlib import sha256
+from mimetypes import guess_extension
 from tempfile import NamedTemporaryFile
+from urllib.parse import urlparse
 
-SUPPORTED_MIMES = ['image/jpeg', 'image/png']
 TITLE = os.environ.get('TITLE', 'AVIF Converter')
 URL = os.environ.get('URL', 'https://example.com/')
 CACHE_TIMEOUT = int(os.environ.get('CACHE_TIMEOUT', 43200))
 GET_MAX_SIZE = int(os.environ.get('GET_MAX_SIZE', 20*1024*1024))
 GCP_BUCKET = os.environ.get('GCP_BUCKET')
+
+# "image/*" are always supported.
+SUPPORTED_MIMES = ['application/octet-stream', 'application/pdf']
 
 # Change the format of messages logged to Stackdriver
 logging.basicConfig(format='%(message)s', level=logging.INFO)
@@ -57,7 +59,7 @@ def api_get():
     try:
         r = requests.head(url)
         content_type = r.headers.get('Content-Type')
-        if not isinstance(content_type, str) or (not content_type.startswith('image/') and not content_type == 'application/octet-stream'):
+        if not isinstance(content_type, str) or (not content_type.startswith('image/') and not content_type in SUPPORTED_MIMES):
             abort(400)
         content_length = r.headers.get('Content-Length')
         if isinstance(content_length, str) and int(content_length) > GET_MAX_SIZE:
@@ -68,7 +70,11 @@ def api_get():
         abort(400)
     if r.status_code != requests.codes.ok:
         abort(400)
-    with NamedTemporaryFile() as tempf:
+    ext = guess_extension(content_type)
+    if not ext:
+        path = urlparse(url).path
+        ext = os.path.splitext(path)[1]
+    with NamedTemporaryFile(suffix=ext) as tempf:
         tempf.write(r.content)
         return avif_convert(tempf.name, url_hash)
 
@@ -78,7 +84,8 @@ def api_post():
     if 'file' not in request.files:
         abort(400)
     f = request.files['file']
-    with NamedTemporaryFile() as tempf:
+    ext = os.path.splitext(f.filename)[1]
+    with NamedTemporaryFile(suffix=ext) as tempf:
         f.save(tempf.name)
         return avif_convert(tempf.name)
 
@@ -95,21 +102,20 @@ def avif_convert(tempf_in, url_hash=None):
                 return send_avif(tempf.name)
             except exceptions.NotFound:
                 logging.info('Cache miss data: {}/{}'.format(GCP_BUCKET, data_hash))
-    with NamedTemporaryFile() as tempf:
+    with NamedTemporaryFile(suffix='.avif') as tempf:
         tempf_out = tempf.name
-        mime = magic.from_file(tempf_in, mime=True)
-        if mime not in SUPPORTED_MIMES:
-            result = subprocess.run(['convert', tempf_in+'[0]', 'png:'+tempf_out])
-            if result.returncode == 0:
-                tempf_in, tempf_out = tempf_out, tempf_in
-            else:
-                logging.error('Could not convert {} to PNG'.format(mime))
-        start = time.perf_counter()
-        result = subprocess.run(['avifenc', '-j', str(multiprocessing.cpu_count()), tempf_in, tempf_out])
-        logging.info('Encoding time: {:.4f}'.format(time.perf_counter() - start))
-        if result.returncode != 0:
-            logging.error('avifenc error')
-            abort(400)
+        result = subprocess.run(['identify', '-format', '%[magick]', tempf_in], capture_output=True, text=True)
+        mime = result.stdout
+        if mime == 'AVIF':
+            tempf_out = tempf_in
+        else:
+            logging.info('Converting {} to AVIF'.format(mime))
+            start = time.perf_counter()
+            result = subprocess.run(['convert', tempf_in+'[0]', 'avif:'+tempf_out])
+            logging.info('Encoding time: {:.4f}'.format(time.perf_counter() - start))
+            if result.returncode != 0:
+                logging.error('Could not convert {} to AVIF'.format(mime))
+                abort(400)
         logging.info('Output file size: %d', os.path.getsize(tempf_out))
         if GCP_BUCKET:
             try:
@@ -149,7 +155,7 @@ def download_blob(bucket_name, source_blob_name, destination_file_name):  # prag
     blob = bucket.blob(source_blob_name)
     blob.download_to_filename(destination_file_name)
 
-    print(
+    logging.debug(
         "Blob {} downloaded to {}.".format(
             source_blob_name, destination_file_name
         )
@@ -166,7 +172,7 @@ def upload_blob(bucket_name, source_file_name, destination_blob_name):  # pragma
 
     blob.upload_from_filename(source_file_name)
 
-    print(
+    logging.debug(
         "File {} uploaded to {}.".format(
             source_file_name, destination_blob_name
         )

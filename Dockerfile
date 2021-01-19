@@ -3,51 +3,53 @@ FROM debian:buster-slim
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True
 ENV APP_HOME /app
-ENV BUILD_DIR /tmp/build
-ENV PATH="/root/.cargo/bin:${PATH}"
 
-WORKDIR $BUILD_DIR
-RUN apt-get update \
-  && apt-get install -y build-essential libjpeg-dev libpng-dev libssl-dev ninja-build cmake pkg-config git curl python3-pip libmagic1 imagemagick
+ARG IM_VERSION=7.0.10-58
+ARG LIB_HEIF_VERSION=1.10.0
+ARG LIB_AOM_VERSION=2.0.1
 
-# Modified from https://github.com/AOMediaCodec/libavif/blob/master/tests/docker/build.sh
+# Based on https://github.com/dooman87/imagemagick-docker/blob/master/Dockerfile.buster
 
-# NASM
-RUN curl -L https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/nasm-2.15.05.tar.gz | tar xvz \
-  && cd nasm-2.15.05 \
-  && ./configure --prefix=/usr \
-  && make -j2 \
-  && make install \
-  && nasm --version \
-  && rm -rf ../nasm-2.15.05
-
-# Rust env and rav1e
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-  && cargo install cargo-c \
-  && git clone -b 0.4 --depth 1 https://github.com/xiph/rav1e.git \
-  && cd rav1e \
-  && RUSTFLAGS="-C target-feature=+avx2,+fma" cargo cinstall --prefix=/usr --release \
-  && rm -rf ../rav1e $HOME/.cargo $HOME/.rustup
-
-# libavif
-RUN git clone -b v0.8.4 --depth 1 https://github.com/AOMediaCodec/libavif.git \
-  && cd libavif \
-  && mkdir build \
-  && cd build \
-  && cmake -G Ninja -DCMAKE_INSTALL_PREFIX=/usr -DAVIF_CODEC_RAV1E=1 -DAVIF_BUILD_APPS=1 .. \
-  && ninja install \
-  && rm -rf ../../libavif
+RUN apt-get -y update && \
+    apt-get install -y git make gcc pkg-config autoconf curl g++ python3-pip \
+    # libaom
+    yasm cmake \
+    # libheif
+    libde265-0 libde265-dev libjpeg62-turbo libjpeg62-turbo-dev x265 libx265-dev libtool \
+    # IM
+    libpng16-16 libpng-dev libjpeg62-turbo libjpeg62-turbo-dev libwebp6 libwebp-dev libgomp1 libwebpmux3 libwebpdemux2 ghostscript libxml2-dev libxml2-utils && \
+    # Building libaom
+    git clone https://aomedia.googlesource.com/aom && \
+    cd aom && git checkout v${LIB_AOM_VERSION} && cd .. && \
+    mkdir build_aom && \
+    cd build_aom && \
+    cmake ../aom/ -DENABLE_TESTS=0 -DBUILD_SHARED_LIBS=1 && make && make install && \
+    ldconfig /usr/local/lib && \
+    cd .. && \
+    rm -rf aom && \
+    rm -rf build_aom && \
+    # Building libheif
+    curl -L https://github.com/strukturag/libheif/releases/download/v${LIB_HEIF_VERSION}/libheif-${LIB_HEIF_VERSION}.tar.gz -o libheif.tar.gz && \
+    tar -xzvf libheif.tar.gz && cd libheif-${LIB_HEIF_VERSION}/ && ./autogen.sh && ./configure && make && make install && cd .. && \
+    ldconfig /usr/local/lib && \
+    rm -rf libheif-${LIB_HEIF_VERSION} && rm libheif.tar.gz && \
+    # Building ImageMagick
+    git clone https://github.com/ImageMagick/ImageMagick.git && \
+    cd ImageMagick && git checkout ${IM_VERSION} && \
+    ./configure --without-magick-plus-plus --disable-docs --disable-static && \
+    make && make install && \
+    ldconfig /usr/local/lib && \
+    apt-get remove --autoremove --purge -y gcc make cmake curl g++ yasm git autoconf pkg-config libpng-dev libjpeg62-turbo-dev libwebp-dev libde265-dev libx265-dev libxml2-dev && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /ImageMagick
 
 # Cleanup and Python app installation
 WORKDIR $APP_HOME
-RUN apt-get remove --autoremove --purge -y build-essential libjpeg-dev libpng-dev libssl-dev ninja-build cmake pkg-config git curl \
-  && rm -rf /var/lib/apt/lists/* \
-  && rm -rf $BUILD_DIR
 RUN pip3 install Flask gunicorn python-magic requests google-cloud-storage coverage
 COPY main.py test.py ./
 COPY static/ ./static/
 COPY templates/ ./templates/
-RUN coverage run --source=./ test.py && coverage report -m && coverage html && mv htmlcov static/
+RUN convert identify -list format && coverage run --source=./ test.py && coverage report -m && coverage html && mv htmlcov static/
 
 # Run the web service on container startup. Here we use the gunicorn
 # webserver, with one worker process and 8 threads.

@@ -9,3 +9,4 @@ __pycache__
 .gitignore
 cloudbuild.yaml
 docker-compose.yml
+test_images

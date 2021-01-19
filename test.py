@@ -1,3 +1,4 @@
+import requests
 import unittest
 import urllib
 
@@ -13,6 +14,10 @@ TEST_NET_JPG = TEST_NET_URL + 'test.jpg'
 TEST_NET_JPG_HASH = 'e7273a6e8842280c3e291297f3c6e3f7d94bb4c0993d771341ec5e22532e6411'  # sha256sum test_images/test.jpg | head -c 64
 TEST_NET_PNG = TEST_NET_URL + 'test.png'
 TEST_NET_BMP = TEST_NET_URL + 'test.bmp'
+TEST_NET_PNG_NOEXT = TEST_NET_URL + 'test_png'
+TEST_NET_HEIC = TEST_NET_URL + 'test.heic'
+TEST_NET_AVIF = TEST_NET_URL + 'test.avif'
+TEST_NET_PDF = TEST_NET_URL + 'test.pdf'
 TEST_NET_NOT_IMAGE = 'https://www.google.com/'
 TEST_NET_TOO_BIG = TEST_NET_URL + 'test_50mb.jpg'
 
@@ -64,6 +69,20 @@ class SmokeTests(unittest.TestCase):
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_GIF)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_PNG_NOEXT, 'rb')))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_PDF, 'rb')))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_HEIC, 'rb')))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_AVIF, 'rb')))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        r = requests.get(TEST_NET_AVIF)
+        self.assertEqual(response.data, r.content)
         mock_dl.side_effect = self.download_blob
         mock_ul.side_effect = self.upload_blob
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_BMP)))
