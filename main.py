@@ -57,7 +57,7 @@ def api_get():
     try:
         r = requests.head(url)
         content_type = r.headers.get('Content-Type')
-        if not isinstance(content_type, str) or not content_type.startswith('image/'):
+        if not isinstance(content_type, str) or (not content_type.startswith('image/') and not content_type == 'application/octet-stream'):
             abort(400)
         content_length = r.headers.get('Content-Length')
         if isinstance(content_length, str) and int(content_length) > GET_MAX_SIZE:

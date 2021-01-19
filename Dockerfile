@@ -30,7 +30,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
   && rm -rf ../rav1e $HOME/.cargo $HOME/.rustup
 
 # libavif
-RUN git clone --depth 1 https://github.com/AOMediaCodec/libavif.git \
+RUN git clone -b v0.8.4 --depth 1 https://github.com/AOMediaCodec/libavif.git \
   && cd libavif \
   && mkdir build \
   && cd build \
