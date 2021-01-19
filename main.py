@@ -71,7 +71,7 @@ def api_get():
     if r.status_code != requests.codes.ok:
         abort(400)
     ext = guess_extension(content_type)
-    if not ext:
+    if not ext or ext == '.a':
         path = urlparse(url).path
         ext = os.path.splitext(path)[1]
     with NamedTemporaryFile(suffix=ext) as tempf:
