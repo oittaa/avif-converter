@@ -1,10 +1,12 @@
 import logging
 import os
+import pathlib
+import re
 import requests
 import subprocess
 import time
 
-from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory
+from flask import Flask, abort, render_template, request, send_file, send_from_directory
 from google.cloud import storage, exceptions
 from hashlib import sha256
 from mimetypes import guess_extension
@@ -73,7 +75,7 @@ def api_get():
     ext = guess_extension(content_type)
     if not ext or ext == '.a':
         path = urlparse(url).path
-        ext = os.path.splitext(path)[1]
+        ext = get_extension(path)
     with NamedTemporaryFile(suffix=ext) as tempf:
         tempf.write(r.content)
         return avif_convert(tempf.name, url_hash)
@@ -84,7 +86,7 @@ def api_post():
     if 'file' not in request.files:
         abort(400)
     f = request.files['file']
-    ext = os.path.splitext(f.filename)[1]
+    ext = get_extension(f.filename)
     with NamedTemporaryFile(suffix=ext) as tempf:
         f.save(tempf.name)
         return avif_convert(tempf.name)
@@ -139,6 +141,14 @@ def sha256sum(filename):
         for n in iter(lambda : f.readinto(mv), 0):
             h.update(mv[:n])
     return h.hexdigest()
+
+def get_extension(path, max_length=16):
+    pattern = re.compile('[\W]+')
+    ext =  pathlib.Path(path).suffix
+    ext = pattern.sub('', ext)
+    if ext:
+        ext = '.' + ext[0:max_length]
+    return ext
 
 def download_blob(bucket_name, source_blob_name, destination_file_name):  # pragma: no cover
     """Downloads a blob from the bucket."""

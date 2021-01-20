@@ -3,7 +3,7 @@ import unittest
 import urllib
 
 from google.cloud import exceptions
-from main import app, sha256sum
+from main import app, get_extension, sha256sum
 from unittest.mock import patch
 
 TEST_LOCAL_JPG = 'static/flowers.jpg'
@@ -118,6 +118,14 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(val1, TEST_LOCAL_JPG_HASH)
         val2 = sha256sum(__file__)
         self.assertNotEqual(val1, val2)
+
+    def test_get_extension(self):
+        val = get_extension('/path/to/file.jpg')
+        self.assertEqual(val, '.jpg')
+        val = get_extension('/path/to/.hidden')
+        self.assertEqual(val, '')
+        val = get_extension('file.€avif@£$‚{[]')
+        self.assertEqual(val, '.avif')
 
 if __name__ == '__main__':
     unittest.main()
