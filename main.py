@@ -6,12 +6,12 @@ import requests
 import subprocess
 import time
 
-from flask import Flask, abort, render_template, request, send_file, send_from_directory
+from flask import Flask, abort, render_template, request, send_file, send_from_directory, url_for
 from google.cloud import storage, exceptions
 from hashlib import sha256
 from mimetypes import guess_extension
 from tempfile import NamedTemporaryFile
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 TITLE = os.environ.get('TITLE', 'AVIF Converter')
 URL = os.environ.get('URL', 'https://example.com/')
@@ -46,6 +46,7 @@ def api_get():
 
     url = request.args.get('url')
     if not isinstance(url, str) or len(request.args) != 1 \
+        or url.startswith(urljoin(URL, url_for('api_get'))) \
         or not url.startswith('https://') \
         and not url.startswith('http://'):
         abort(400)

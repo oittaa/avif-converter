@@ -31,11 +31,11 @@
          <div style="margin:auto;background: #f0f0f0; overflow:auto;max-width: 800px;border:solid #00008B;border-width:.1em .1em .1em .8em;padding:.2em .6em;">
             <pre style="margin: 0; line-height: 125%"><span style="color: #007020; font-weight: bold">import</span> <span style="color: #0e84b5; font-weight: bold">requests</span>
 
-url <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;{{ url }}api&#39;</span>
+api_url <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;{{ url }}api&#39;</span>
 input_file <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;/path/to/image.jpg&#39;</span>
 output_file <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;/path/to/image.avif&#39;</span>
 
-r <span style="color: #666666">=</span> requests<span style="color: #666666">.</span>post(url, files<span style="color: #666666">=</span>{<span style="color: #4070a0">&#39;file&#39;</span>: <span style="color: #007020">open</span>(input_file,<span style="color: #4070a0">&#39;rb&#39;</span>)})
+r <span style="color: #666666">=</span> requests<span style="color: #666666">.</span>post(api_url, files<span style="color: #666666">=</span>{<span style="color: #4070a0">&#39;file&#39;</span>: <span style="color: #007020">open</span>(input_file,<span style="color: #4070a0">&#39;rb&#39;</span>)})
 <span style="color: #007020; font-weight: bold">if</span> r<span style="color: #666666">.</span>status_code <span style="color: #666666">==</span> requests<span style="color: #666666">.</span>codes<span style="color: #666666">.</span>ok <span style="color: #007020; font-weight: bold">and</span> r<span style="color: #666666">.</span>headers<span style="color: #666666">.</span>get(<span style="color: #4070a0">&#39;Content-Type&#39;</span>) <span style="color: #666666">==</span> <span style="color: #4070a0">&#39;image/avif&#39;</span>:
     <span style="color: #007020; font-weight: bold">with</span> <span style="color: #007020">open</span>(output_file, <span style="color: #4070a0">&#39;wb&#39;</span>) <span style="color: #007020; font-weight: bold">as</span> f:
         f<span style="color: #666666">.</span>write(r<span style="color: #666666">.</span>content)
@@ -47,11 +47,11 @@ r <span style="color: #666666">=</span> requests<span style="color: #666666">.</
          <div style="margin:auto;background: #f0f0f0; overflow:auto;max-width: 800px;border:solid #00008B;border-width:.1em .1em .1em .8em;padding:.2em .6em;">
             <pre style="margin: 0; line-height: 125%"><span style="color: #007020; font-weight: bold">import</span> <span style="color: #0e84b5; font-weight: bold">requests</span>
 
-url <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;{{ url }}api&#39;</span>
+api_url <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;{{ url }}api&#39;</span>
 input_url <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;{{ url }}static/flowers.jpg&#39;</span>
 output_file <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;/path/to/flowers.avif&#39;</span>
 
-r <span style="color: #666666">=</span> requests<span style="color: #666666">.</span>get(url, params<span style="color: #666666">=</span>{<span style="color: #4070a0">&#39;url&#39;</span>: input_url})
+r <span style="color: #666666">=</span> requests<span style="color: #666666">.</span>get(api_url, params<span style="color: #666666">=</span>{<span style="color: #4070a0">&#39;url&#39;</span>: input_url})
 <span style="color: #007020; font-weight: bold">if</span> r<span style="color: #666666">.</span>status_code <span style="color: #666666">==</span> requests<span style="color: #666666">.</span>codes<span style="color: #666666">.</span>ok <span style="color: #007020; font-weight: bold">and</span> r<span style="color: #666666">.</span>headers<span style="color: #666666">.</span>get(<span style="color: #4070a0">&#39;Content-Type&#39;</span>) <span style="color: #666666">==</span> <span style="color: #4070a0">&#39;image/avif&#39;</span>:
     <span style="color: #007020; font-weight: bold">with</span> <span style="color: #007020">open</span>(output_file, <span style="color: #4070a0">&#39;wb&#39;</span>) <span style="color: #007020; font-weight: bold">as</span> f:
         f<span style="color: #666666">.</span>write(r<span style="color: #666666">.</span>content)
