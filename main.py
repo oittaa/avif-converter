@@ -45,7 +45,9 @@ def api_get():
     url_hash = None
 
     url = request.args.get('url')
-    if not isinstance(url, str) or (not url.startswith('https://') and not url.startswith('http://')):
+    if not isinstance(url, str) or len(request.args) != 1 \
+        or not url.startswith('https://') \
+        and not url.startswith('http://'):
         abort(400)
 
     if GCP_BUCKET:
@@ -109,6 +111,7 @@ def avif_convert(tempf_in, url_hash=None):
         result = subprocess.run(['identify', '-format', '%[magick]', tempf_in], capture_output=True, text=True)
         mime = result.stdout
         if mime == 'AVIF':
+            logging.info('Using original AVIF')
             tempf_out = tempf_in
         else:
             logging.info('Converting {} to AVIF'.format(mime))

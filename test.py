@@ -111,6 +111,8 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         response = self.app.post('/api', data={'file': open(__file__, 'rb')})
         self.assertEqual(response.status_code, 400)
+        response = self.app.get('/api?invalid=1&url={}'.format(urllib.parse.quote(TEST_NET_PNG)))
+        self.assertEqual(response.status_code, 400)
 
     def test_sha256sum(self):
         val1 = sha256sum(TEST_LOCAL_JPG)
