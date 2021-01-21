@@ -6,7 +6,7 @@ ENV APP_HOME /app
 
 RUN apt-get -y update && \
     apt-get install -y python3-pip && \
-    pip3 install Flask coverage google-cloud-storage gunicorn requests && \
+    pip3 install Flask coverage flask-talisman google-cloud-storage gunicorn requests && \
     apt-get remove --autoremove --purge -y build-essential '*-dev' && \
     rm -rf /var/lib/apt/lists/*
 

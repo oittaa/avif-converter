@@ -6,7 +6,8 @@ import requests
 import subprocess
 import time
 
-from flask import Flask, abort, render_template, request, send_file, send_from_directory, url_for
+from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory, url_for
+from flask_talisman import Talisman
 from google.cloud import storage, exceptions
 from hashlib import sha256
 from mimetypes import guess_extension
@@ -14,6 +15,7 @@ from tempfile import NamedTemporaryFile
 from urllib.parse import urljoin, urlparse
 
 CACHE_TIMEOUT = int(os.environ.get('CACHE_TIMEOUT', 43200))
+FORCE_HTTPS = bool(os.environ.get('FORCE_HTTPS', ''))
 GCP_BUCKET = os.environ.get('GCP_BUCKET')
 GET_MAX_SIZE = int(os.environ.get('GET_MAX_SIZE', 20*1024*1024))
 REMOTE_REQUEST_TIMEOUT = float(os.environ.get('REMOTE_REQUEST_TIMEOUT', 10.0))
@@ -26,8 +28,20 @@ SUPPORTED_MIMES = ['application/octet-stream', 'application/pdf']
 # Change the format of messages logged to Stackdriver
 logging.basicConfig(format='%(message)s', level=logging.INFO)
 
+csp = {
+ 'default-src': [
+        '\'self\'',
+        'cdnjs.cloudflare.com'
+    ],
+    'script-src': '\'self\' \'unsafe-inline\'',
+    'style-src': '\'self\' \'unsafe-inline\' cdnjs.cloudflare.com'
+}
 app = Flask(__name__)
-
+talisman = Talisman(
+    app,
+    content_security_policy=csp,
+    force_https=FORCE_HTTPS
+)
 
 if GCP_BUCKET:  # pragma: no cover
     storage_client = storage.Client()
@@ -44,10 +58,15 @@ def index():
 @app.route('/api', methods=['GET'])
 def api_get():
     url_hash = None
+    url_hash_pattern = re.compile(r'^[0-9a-f]{64}$')
 
     url = request.args.get('url')
-    if not isinstance(url, str) or len(request.args) != 1 \
-        or not url.startswith('https://') \
+    if not isinstance(url, str) or len(request.args) != 1:
+        abort(400)
+
+    match = re.search(url_hash_pattern, url)
+    if not match \
+        and not url.startswith('https://') \
         and not url.startswith('http://'):
         abort(400)
 
@@ -56,7 +75,10 @@ def api_get():
         abort(400)
 
     if GCP_BUCKET:
-        url_hash = sha256(url.encode('utf-8')).hexdigest()
+        if match:
+            url_hash = match.group(0)
+        else:
+            url_hash = sha256(url.encode('utf-8')).hexdigest()
         with NamedTemporaryFile() as tempf:
             try:
                 download_blob(GCP_BUCKET, url_hash, tempf.name)
@@ -65,6 +87,8 @@ def api_get():
             except exceptions.NotFound:
                 logging.info('Cache miss URL: {}/{}'.format(GCP_BUCKET, url_hash))
 
+    if match:
+        abort(404)
     try:
         r = requests.head(url, timeout=REMOTE_REQUEST_TIMEOUT)
         content_type = r.headers.get('Content-Type')
@@ -108,6 +132,8 @@ def avif_convert(tempf_in, url_hash=None):
                 logging.info('Cache hit data: {}/{}'.format(GCP_BUCKET, data_hash))
                 if url_hash:
                     upload_blob(GCP_BUCKET, tempf.name, url_hash)
+                else:
+                    return redirect(url_for('api_get', url=data_hash))
                 return send_avif(tempf.name)
             except exceptions.NotFound:
                 logging.info('Cache miss data: {}/{}'.format(GCP_BUCKET, data_hash))
@@ -132,6 +158,8 @@ def avif_convert(tempf_in, url_hash=None):
                 upload_blob(GCP_BUCKET, tempf_out, data_hash)
                 if url_hash:
                     upload_blob(GCP_BUCKET, tempf_out, url_hash)
+                else:
+                    return redirect(url_for('api_get', url=data_hash))
             except exceptions.NotFound:
                 logging.error('Could not update cache: {}/{}'.format(GCP_BUCKET, data_hash))
         return send_avif(tempf_out)

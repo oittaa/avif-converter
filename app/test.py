@@ -74,6 +74,16 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
         self.assertTrue(is_avif(response.data))
+        mock_dl.side_effect = self.download_blob
+        mock_ul.side_effect = self.upload_blob
+        response = self.app.post('/api', data={'file': open(TEST_LOCAL_PNG, 'rb')}, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        self.assertTrue(is_avif(response.data))
+        response = self.app.post('/api', data={'file': open(TEST_LOCAL_PNG, 'rb')}, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        self.assertTrue(is_avif(response.data))
 
     @patch('main.upload_blob', side_effect=exceptions.NotFound('Test'))
     @patch('main.download_blob', side_effect=exceptions.NotFound('Test'))
@@ -137,7 +147,9 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         quoted_url = urllib.parse.quote(TEST_NET_PNG)
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(URL+'api?url='+quoted_url)))
-        self.assertEqual(response.status_code, 400) 
+        self.assertEqual(response.status_code, 400)
+        response = self.app.get('/api?url={}'.format(TEST_NET_JPG_HASH))
+        self.assertEqual(response.status_code, 404)
 
     def test_sha256sum(self):
         val1 = sha256sum(TEST_LOCAL_PNG)
