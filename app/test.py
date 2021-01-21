@@ -1,13 +1,15 @@
 import requests
+import subprocess
 import unittest
 import urllib
 
 from google.cloud import exceptions
 from main import app, get_extension, sha256sum, URL
+from tempfile import NamedTemporaryFile
 from unittest.mock import patch
 
-TEST_LOCAL_JPG = 'static/flowers.jpg'
-TEST_LOCAL_JPG_HASH = '17aba341360280d48dc475adf0bc4dc90a623b31e652c35fa1e1b966e921b7dd'  # sha256sum static/flowers.jpg | head -c 64
+TEST_LOCAL_PNG = 'static/tux.png'
+TEST_LOCAL_PNG_HASH = '4358b1e6137fd60a49ad90d108b73c0116738552d78cf4fceb56a89f044c342f'  # sha256sum static/tux.png | head -c 64
 TEST_NET_URL = 'https://raw.githubusercontent.com/oittaa/avif-converter/master/test_images/'
 TEST_NET_GIF = TEST_NET_URL + 'test.gif'
 TEST_NET_JPG = TEST_NET_URL + 'test.jpg'
@@ -20,6 +22,18 @@ TEST_NET_AVIF = TEST_NET_URL + 'test.avif'
 TEST_NET_PDF = TEST_NET_URL + 'test.pdf'
 TEST_NET_NOT_IMAGE = 'https://www.google.com/'
 TEST_NET_TOO_BIG = TEST_NET_URL + 'test_50mb.jpg'
+
+def is_avif(data):
+    """Checks if data is AVIF."""
+    with NamedTemporaryFile(suffix='.avif') as tempf:
+        tempf.write(data)
+        result = subprocess.run(['identify', '-format', '%[magick]', tempf.name], capture_output=True, text=True)
+        mime = result.stdout
+        if mime == 'AVIF':
+            return True
+        else:
+            print('Error: got type {}'.format(mime))
+            return False
 
 # https://docs.python.org/3/library/unittest.mock.html#quick-guide
 # Note: When you nest patch decorators the mocks are passed in to
@@ -56,9 +70,10 @@ class SmokeTests(unittest.TestCase):
     @patch('main.upload_blob', side_effect=exceptions.NotFound('Test'))
     @patch('main.download_blob', side_effect=exceptions.NotFound('Test'))
     def test_api_post(self, mock_dl, mock_ul):
-        response = self.app.post('/api', data={'file': open(TEST_LOCAL_JPG, 'rb')})
+        response = self.app.post('/api', data={'file': open(TEST_LOCAL_PNG, 'rb')})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        self.assertTrue(is_avif(response.data))
 
     @patch('main.upload_blob', side_effect=exceptions.NotFound('Test'))
     @patch('main.download_blob', side_effect=exceptions.NotFound('Test'))
@@ -66,18 +81,23 @@ class SmokeTests(unittest.TestCase):
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_PNG)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        self.assertTrue(is_avif(response.data))
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_GIF)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        self.assertTrue(is_avif(response.data))
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_PNG_NOEXT, 'rb')))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        self.assertTrue(is_avif(response.data))
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_PDF, 'rb')))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        self.assertTrue(is_avif(response.data))
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_HEIC, 'rb')))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        self.assertTrue(is_avif(response.data))
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_AVIF, 'rb')))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
@@ -88,9 +108,11 @@ class SmokeTests(unittest.TestCase):
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_BMP)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        temp_data = response.data
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_BMP)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
+        self.assertEqual(response.data, temp_data)
         self.cache['-testing-'+TEST_NET_JPG_HASH] = 'FAKEDATA'.encode()
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_JPG)))
         self.assertEqual(response.status_code, 200)
@@ -107,7 +129,7 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         response = self.app.get('/api?url=https%3A//this-address-does-not-exist')
         self.assertEqual(response.status_code, 400)
-        response = self.app.post('/api', data={'xx': open(TEST_LOCAL_JPG, 'rb')})
+        response = self.app.post('/api', data={'xx': open(TEST_LOCAL_PNG, 'rb')})
         self.assertEqual(response.status_code, 400)
         response = self.app.post('/api', data={'file': open(__file__, 'rb')})
         self.assertEqual(response.status_code, 400)
@@ -118,9 +140,9 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400) 
 
     def test_sha256sum(self):
-        val1 = sha256sum(TEST_LOCAL_JPG)
+        val1 = sha256sum(TEST_LOCAL_PNG)
         self.assertEqual(len(val1), 64)
-        self.assertEqual(val1, TEST_LOCAL_JPG_HASH)
+        self.assertEqual(val1, TEST_LOCAL_PNG_HASH)
         val2 = sha256sum(__file__)
         self.assertNotEqual(val1, val2)
 

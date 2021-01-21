@@ -1,7 +1,7 @@
 # avif-converter docker image
 
 To build and use avif-converter locally in a Debian Docker container with all dependencies,
-change into this directory and run:
+change into `app` directory and run:
 
     docker-compose up --build avif-converter
 

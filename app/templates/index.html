@@ -48,8 +48,8 @@ r <span style="color: #666666">=</span> requests<span style="color: #666666">.</
             <pre style="margin: 0; line-height: 125%"><span style="color: #007020; font-weight: bold">import</span> <span style="color: #0e84b5; font-weight: bold">requests</span>
 
 api_url <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;{{ url }}api&#39;</span>
-input_url <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;{{ url }}static/flowers.jpg&#39;</span>
-output_file <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;/path/to/flowers.avif&#39;</span>
+input_url <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;{{ url }}static/tux.png&#39;</span>
+output_file <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;/path/to/tux.avif&#39;</span>
 
 r <span style="color: #666666">=</span> requests<span style="color: #666666">.</span>get(api_url, params<span style="color: #666666">=</span>{<span style="color: #4070a0">&#39;url&#39;</span>: input_url})
 <span style="color: #007020; font-weight: bold">if</span> r<span style="color: #666666">.</span>status_code <span style="color: #666666">==</span> requests<span style="color: #666666">.</span>codes<span style="color: #666666">.</span>ok <span style="color: #007020; font-weight: bold">and</span> r<span style="color: #666666">.</span>headers<span style="color: #666666">.</span>get(<span style="color: #4070a0">&#39;Content-Type&#39;</span>) <span style="color: #666666">==</span> <span style="color: #4070a0">&#39;image/avif&#39;</span>:
@@ -67,8 +67,8 @@ r <span style="color: #666666">=</span> requests<span style="color: #666666">.</
          <h2>HTML</h2>
          <div style="margin:auto;background: #f0f0f0; overflow:auto;max-width: 800px;border:solid #00008B;border-width:.1em .1em .1em .8em;padding:.2em .6em;">
             <pre style="margin: 0; line-height: 125%"><span style="color: #062873; font-weight: bold">&lt;picture&gt;</span>
-	<span style="color: #062873; font-weight: bold">&lt;source</span> <span style="color: #4070a0">srcset=&quot;{{ url }}api?url={{ url|urlencode }}static/flowers.jpg&quot;</span> <span style="color: #4070a0">type=&quot;image/avif&quot;</span><span style="color: #062873; font-weight: bold">&gt;</span>
-	<span style="color: #062873; font-weight: bold">&lt;img</span> <span style="color: #4070a0">src=&quot;{{ url }}static/flowers.jpg&quot;</span> <span style="color: #4070a0">alt=&quot;flowers&quot;</span><span style="color: #062873; font-weight: bold">&gt;</span>
+	<span style="color: #062873; font-weight: bold">&lt;source</span> <span style="color: #4070a0">srcset=&quot;{{ url }}api?url={{ url|urlencode }}static/tux.png&quot;</span> <span style="color: #4070a0">type=&quot;image/avif&quot;</span><span style="color: #062873; font-weight: bold">&gt;</span>
+	<span style="color: #062873; font-weight: bold">&lt;img</span> <span style="color: #4070a0">src=&quot;{{ url }}static/tux.png&quot;</span> <span style="color: #4070a0">alt=&quot;tux&quot;</span><span style="color: #062873; font-weight: bold">&gt;</span>
 <span style="color: #062873; font-weight: bold">&lt;/picture&gt;</span>
 </pre>
          </div>
