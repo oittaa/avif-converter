@@ -13,11 +13,12 @@ from mimetypes import guess_extension
 from tempfile import NamedTemporaryFile
 from urllib.parse import urljoin, urlparse
 
+CACHE_TIMEOUT = int(os.environ.get('CACHE_TIMEOUT', 43200))
+GCP_BUCKET = os.environ.get('GCP_BUCKET')
+GET_MAX_SIZE = int(os.environ.get('GET_MAX_SIZE', 20*1024*1024))
+REMOTE_REQUEST_TIMEOUT = float(os.environ.get('REMOTE_REQUEST_TIMEOUT', 10.0))
 TITLE = os.environ.get('TITLE', 'AVIF Converter')
 URL = os.environ.get('URL', 'https://example.com/')
-CACHE_TIMEOUT = int(os.environ.get('CACHE_TIMEOUT', 43200))
-GET_MAX_SIZE = int(os.environ.get('GET_MAX_SIZE', 20*1024*1024))
-GCP_BUCKET = os.environ.get('GCP_BUCKET')
 
 # "image/*" are always supported.
 SUPPORTED_MIMES = ['application/octet-stream', 'application/pdf']
@@ -46,9 +47,12 @@ def api_get():
 
     url = request.args.get('url')
     if not isinstance(url, str) or len(request.args) != 1 \
-        or url.startswith(urljoin(URL, url_for('api_get'))) \
         or not url.startswith('https://') \
         and not url.startswith('http://'):
+        abort(400)
+
+    # Recursive query
+    if url.startswith(urljoin(URL, url_for('api_get'))):
         abort(400)
 
     if GCP_BUCKET:
@@ -62,7 +66,7 @@ def api_get():
                 logging.info('Cache miss URL: {}/{}'.format(GCP_BUCKET, url_hash))
 
     try:
-        r = requests.head(url)
+        r = requests.head(url, timeout=REMOTE_REQUEST_TIMEOUT)
         content_type = r.headers.get('Content-Type')
         if not isinstance(content_type, str) or (not content_type.startswith('image/') and not content_type in SUPPORTED_MIMES):
             abort(400)
@@ -70,7 +74,7 @@ def api_get():
         if isinstance(content_length, str) and int(content_length) > GET_MAX_SIZE:
             abort(406)
         logging.info('Fetching URL: %s', url)
-        r = requests.get(url)
+        r = requests.get(url, timeout=REMOTE_REQUEST_TIMEOUT)
     except requests.exceptions.RequestException as e:
         abort(400)
     if r.status_code != requests.codes.ok:

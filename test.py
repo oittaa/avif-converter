@@ -3,7 +3,7 @@ import unittest
 import urllib
 
 from google.cloud import exceptions
-from main import app, get_extension, sha256sum
+from main import app, get_extension, sha256sum, URL
 from unittest.mock import patch
 
 TEST_LOCAL_JPG = 'static/flowers.jpg'
@@ -113,6 +113,9 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         response = self.app.get('/api?invalid=1&url={}'.format(urllib.parse.quote(TEST_NET_PNG)))
         self.assertEqual(response.status_code, 400)
+        quoted_url = urllib.parse.quote(TEST_NET_PNG)
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(URL+'api?url='+quoted_url)))
+        self.assertEqual(response.status_code, 400) 
 
     def test_sha256sum(self):
         val1 = sha256sum(TEST_LOCAL_JPG)
