@@ -4,96 +4,68 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>{{ title }}</title>
-      <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
-      <style>
-         html{height:90%}body{height:100%;background-color:#2590eb;color:#333}h1,h2{text-align:center}footer{position:fixed;left:0;bottom:0;height:30px;width:100%}.btn{background-color:#4169e1;border:none;border-radius:4px;color:#fff;padding:12px 16px;font-size:16px;cursor:pointer}.btn:hover{background-color:#1e90ff}.wrapper{width:100%;height:35%;display:flex;align-items:center;justify-content:center}.wrapper .file-upload{height:200px;width:200px;border-radius:100px;position:relative;display:flex;justify-content:center;align-items:center;border:4px solid #fff;overflow:hidden;background-image:linear-gradient(to bottom,#2590eb 50%,#fff 50%);background-size:100% 200%;transition:all 1s;color:#fff;font-size:100px}.wrapper .file-upload input[type=file]{height:200px;width:200px;position:absolute;top:0;left:0;opacity:0;cursor:pointer}.wrapper .file-upload:hover{background-position:0 -100%;color:#2590eb}.api-info{display:none;padding-bottom:2em}input[type=url]{max-width:800px;padding:12px 20px;margin:8px 0;display:inline-block;border:1px solid #ccc;border-radius:4px;box-sizing:border-box}
-      </style>
+      <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" />
+      <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" integrity="sha384-hhKcPZ3KA9mwiYX7WsJ/OTavZJNJJyccfts1Ma83tYg9X3ybxbC2nu82p7C7fj9o" />
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" integrity="sha512-HK5fgLBL+xu6dm/Ii3z4xhlSUyZgTT9tuc/hSrtw6uzJOvgRr2a9jyxxT1ely+B+xFAmJKVSTbpM/CuL7qxO8w==" crossorigin="anonymous" />
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" />
    </head>
    <body>
       <div class="wrapper">
          <div class="file-upload">
-            <form method="post" enctype="multipart/form-data" action="{{ url_for('api_post') }}">
-               <input type="file" name="file" onfocus="giveOnchangeEvent(this)">
+            <form method="post" id="form1" enctype="multipart/form-data" action="{{ url_for('api_post') }}">
+               <input type="file" name="file" id="file">
                <i class="fa fa-arrow-up"></i>
             </form>
          </div>
       </div>
       <div class="wrapper">
-          <form method="get" action="{{ url_for('api_get') }}">
-             <input autofocus type="url" name="url" id="url" placeholder="https://..." autocomplete="off" onpaste="delaySubmit(this)">
+          <form method="get" id="form2" action="{{ url_for('api_get') }}">
+             <input autofocus type="url" name="url" id="url" placeholder="https://..." autocomplete="off">
              <input class="btn" type="submit" value="Go">
           </form>
       </div>
-      <h1><a href="#" onclick="toggle_visibility('api-info');">API</a></h1>
+      <h1><a href="#" id="api">API</a></h1>
       <div id="api-info" class="api-info">
          <h2>Python</h2>
-         <div style="margin:auto;background: #f0f0f0; overflow:auto;max-width: 800px;border:solid #00008B;border-width:.1em .1em .1em .8em;padding:.2em .6em;">
-            <pre style="margin: 0; line-height: 125%"><span style="color: #007020; font-weight: bold">import</span> <span style="color: #0e84b5; font-weight: bold">requests</span>
+         <pre><code class="language-python">import requests
 
-api_url <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;{{ url }}api&#39;</span>
-input_file <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;/path/to/image.jpg&#39;</span>
-output_file <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;/path/to/image.avif&#39;</span>
+api_url = '{{ url }}api'
+input_file = '/path/to/image.jpg'
+output_file = '/path/to/image.avif'
 
-r <span style="color: #666666">=</span> requests<span style="color: #666666">.</span>post(api_url, files<span style="color: #666666">=</span>{<span style="color: #4070a0">&#39;file&#39;</span>: <span style="color: #007020">open</span>(input_file,<span style="color: #4070a0">&#39;rb&#39;</span>)})
-<span style="color: #007020; font-weight: bold">if</span> r<span style="color: #666666">.</span>status_code <span style="color: #666666">==</span> requests<span style="color: #666666">.</span>codes<span style="color: #666666">.</span>ok <span style="color: #007020; font-weight: bold">and</span> r<span style="color: #666666">.</span>headers<span style="color: #666666">.</span>get(<span style="color: #4070a0">&#39;Content-Type&#39;</span>) <span style="color: #666666">==</span> <span style="color: #4070a0">&#39;image/avif&#39;</span>:
-    <span style="color: #007020; font-weight: bold">with</span> <span style="color: #007020">open</span>(output_file, <span style="color: #4070a0">&#39;wb&#39;</span>) <span style="color: #007020; font-weight: bold">as</span> f:
-        f<span style="color: #666666">.</span>write(r<span style="color: #666666">.</span>content)
-<span style="color: #007020; font-weight: bold">else</span>:
-    <span style="color: #007020">print</span>(<span style="color: #4070a0">&#39;error&#39;</span>)
-</pre>
-         </div>
-         <br>
-         <div style="margin:auto;background: #f0f0f0; overflow:auto;max-width: 800px;border:solid #00008B;border-width:.1em .1em .1em .8em;padding:.2em .6em;">
-            <pre style="margin: 0; line-height: 125%"><span style="color: #007020; font-weight: bold">import</span> <span style="color: #0e84b5; font-weight: bold">requests</span>
+r = requests.post(api_url, files={'file': open(input_file,'rb')})
+if r.status_code == requests.codes.ok and r.headers.get('Content-Type') == 'image/avif':
+    with open(output_file, 'wb') as f:
+        f.write(r.content)
+else:
+    print('error')</code></pre>
+    <br>
+    <pre><code class="language-python">import requests
 
-api_url <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;{{ url }}api&#39;</span>
-input_url <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;{{ url }}static/tux.png&#39;</span>
-output_file <span style="color: #666666">=</span> <span style="color: #4070a0">&#39;/path/to/tux.avif&#39;</span>
+api_url = '{{ url }}api'
+input_url = '{{ url }}static/tux.png'
+output_file = '/path/to/tux.avif'
 
-r <span style="color: #666666">=</span> requests<span style="color: #666666">.</span>get(api_url, params<span style="color: #666666">=</span>{<span style="color: #4070a0">&#39;url&#39;</span>: input_url})
-<span style="color: #007020; font-weight: bold">if</span> r<span style="color: #666666">.</span>status_code <span style="color: #666666">==</span> requests<span style="color: #666666">.</span>codes<span style="color: #666666">.</span>ok <span style="color: #007020; font-weight: bold">and</span> r<span style="color: #666666">.</span>headers<span style="color: #666666">.</span>get(<span style="color: #4070a0">&#39;Content-Type&#39;</span>) <span style="color: #666666">==</span> <span style="color: #4070a0">&#39;image/avif&#39;</span>:
-    <span style="color: #007020; font-weight: bold">with</span> <span style="color: #007020">open</span>(output_file, <span style="color: #4070a0">&#39;wb&#39;</span>) <span style="color: #007020; font-weight: bold">as</span> f:
-        f<span style="color: #666666">.</span>write(r<span style="color: #666666">.</span>content)
-<span style="color: #007020; font-weight: bold">else</span>:
-    <span style="color: #007020">print</span>(<span style="color: #4070a0">&#39;error&#39;</span>)
-</pre>
-         </div>
+r = requests.get(api_url, params={'url': input_url})
+if r.status_code == requests.codes.ok and r.headers.get('Content-Type') == 'image/avif':
+    with open(output_file, 'wb') as f:
+        f.write(r.content)
+else:
+    print('error')</code></pre>
+
          <h2>Shell</h2>
-         <div style="margin:auto;background: #f0f0f0; overflow:auto;max-width: 800px;border:solid #00008B;border-width:.1em .1em .1em .8em;padding:.2em .6em;">
-            <pre style="margin: 0; line-height: 125%">curl --output /path/to/image.avif -L -F <span style="color: #4070a0">&quot;file=@/path/to/image.jpg&quot;</span> {{ url }}api
-</pre>
-         </div>
+         <pre><code class="language-shell">curl --output /path/to/image.avif -L -F "file=@/path/to/image.jpg" {{ url }}api</code></pre>
+
          <h2>HTML</h2>
-         <div style="margin:auto;background: #f0f0f0; overflow:auto;max-width: 800px;border:solid #00008B;border-width:.1em .1em .1em .8em;padding:.2em .6em;">
-            <pre style="margin: 0; line-height: 125%"><span style="color: #062873; font-weight: bold">&lt;picture&gt;</span>
-	<span style="color: #062873; font-weight: bold">&lt;source</span> <span style="color: #4070a0">srcset=&quot;{{ url }}api?url={{ url|urlencode }}static/tux.png&quot;</span> <span style="color: #4070a0">type=&quot;image/avif&quot;</span><span style="color: #062873; font-weight: bold">&gt;</span>
-	<span style="color: #062873; font-weight: bold">&lt;img</span> <span style="color: #4070a0">src=&quot;{{ url }}static/tux.png&quot;</span> <span style="color: #4070a0">alt=&quot;tux&quot;</span><span style="color: #062873; font-weight: bold">&gt;</span>
-<span style="color: #062873; font-weight: bold">&lt;/picture&gt;</span>
-</pre>
-         </div>
+         <pre><code class="language-html">&lt;picture&gt;
+    &lt;source srcset="{{ url }}api?url={{ url|urlencode }}static/tux.png" type="image/avif"&gt;
+    &lt;img src="{{ url }}static/tux.png" alt="tux"&gt;
+&lt;/picture&gt;</code></pre>
+    
       </div>
       <footer>&nbsp;<a href="https://github.com/oittaa/avif-converter"><i class="fab fa-github"></i></a></footer>
-      <script>
-         function giveOnchangeEvent(input) {
-             input.onchange = function() {
-                 input.form.submit();
-             }
-         }
-         function delaySubmit(input, delay = 50) {
-             setTimeout(function() {
-                 if (document.getElementById('url').value.startsWith('http')) {
-                     input.form.submit();
-                 }
-             }, delay);
-         }
-         function toggle_visibility(id) {
-             var e = document.getElementById(id);
-             if(e.style.display == 'block')
-                 e.style.display = 'none';
-             else
-                 e.style.display = 'block';
-         }
-      </script>
+      <script src="{{ url_for('static', filename='javascript.js') }}" integrity="sha384-tr3yzZNsu+TNjaDyWbWSdNhjmTKh+FgG5m0k8f9FRzwmV6HzDv2zNptYxeC1jyEY"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/components/prism-core.min.js" integrity="sha512-xR+IAyN+t9EBIOOJw5m83FTVMDsPd63IhJ3ElP4gmfUFnQlX9+eWGLp3P4t3gIjpo2Z1JzqtW/5cjgn+oru3yQ==" crossorigin="anonymous"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/plugins/autoloader/prism-autoloader.min.js" integrity="sha512-zc7WDnCM3aom2EziyDIRAtQg1mVXLdILE09Bo+aE1xk0AM2c2cVLfSW9NrxE5tKTX44WBY0Z2HClZ05ur9vB6A==" crossorigin="anonymous"></script>
    </body>
 </html>

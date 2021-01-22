@@ -32,9 +32,7 @@ csp = {
  'default-src': [
         '\'self\'',
         'cdnjs.cloudflare.com'
-    ],
-    'script-src': '\'self\' \'unsafe-inline\'',
-    'style-src': '\'self\' \'unsafe-inline\' cdnjs.cloudflare.com'
+    ]
 }
 app = Flask(__name__)
 talisman = Talisman(
