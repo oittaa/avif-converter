@@ -4,7 +4,7 @@ import unittest
 import urllib
 
 from google.cloud import exceptions
-from main import app, get_extension, sha256sum, URL
+from main import app, calculate_sri_on_file, get_extension, sha256sum, URL
 from tempfile import NamedTemporaryFile
 from unittest.mock import patch
 
@@ -22,6 +22,9 @@ TEST_NET_AVIF = TEST_NET_URL + 'test.avif'
 TEST_NET_PDF = TEST_NET_URL + 'test.pdf'
 TEST_NET_NOT_IMAGE = 'https://www.google.com/'
 TEST_NET_TOO_BIG = TEST_NET_URL + 'test_50mb.jpg'
+EMPTY_FILE_SRI = 'sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb'  # echo -n "" | openssl dgst -sha384 -binary | openssl base64 -A
+TEST_STRING = 'alert(\'Hello, world.\');'
+TEST_STRING_SRI = 'sha384-H8BRh8j48O9oYatfu5AZzq6A9RINhZO5H16dQZngK7T62em8MUt1FLm52t+eX6xO'  # echo -n "alert('Hello, world.');" | openssl dgst -sha384 -binary | openssl base64 -A
 
 def is_avif(data):
     """Checks if data is AVIF."""
@@ -165,6 +168,15 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(val, '')
         val = get_extension('file.€avif@£$‚{[]')
         self.assertEqual(val, '.avif')
+
+    def test_sri(self):
+        with NamedTemporaryFile() as tempf:
+            val1 = calculate_sri_on_file(tempf.name)
+            tempf.write(TEST_STRING.encode())
+            tempf.flush()
+            val2 = calculate_sri_on_file(tempf.name)
+        self.assertEqual(val1, EMPTY_FILE_SRI)
+        self.assertEqual(val2, TEST_STRING_SRI)
 
 if __name__ == '__main__':
     unittest.main()

@@ -5,7 +5,7 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>{{ title }}</title>
       <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" />
-      <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" integrity="sha384-hhKcPZ3KA9mwiYX7WsJ/OTavZJNJJyccfts1Ma83tYg9X3ybxbC2nu82p7C7fj9o" />
+      <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" integrity="{{ css_sri }}" />
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" integrity="sha512-HK5fgLBL+xu6dm/Ii3z4xhlSUyZgTT9tuc/hSrtw6uzJOvgRr2a9jyxxT1ely+B+xFAmJKVSTbpM/CuL7qxO8w==" crossorigin="anonymous" />
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" />
    </head>
@@ -64,7 +64,7 @@ else:
     
       </div>
       <footer>&nbsp;<a href="https://github.com/oittaa/avif-converter"><i class="fab fa-github"></i></a></footer>
-      <script src="{{ url_for('static', filename='javascript.js') }}" integrity="sha384-tr3yzZNsu+TNjaDyWbWSdNhjmTKh+FgG5m0k8f9FRzwmV6HzDv2zNptYxeC1jyEY"></script>
+      <script src="{{ url_for('static', filename='javascript.js') }}" integrity="{{ js_sri }}"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/components/prism-core.min.js" integrity="sha512-xR+IAyN+t9EBIOOJw5m83FTVMDsPd63IhJ3ElP4gmfUFnQlX9+eWGLp3P4t3gIjpo2Z1JzqtW/5cjgn+oru3yQ==" crossorigin="anonymous"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/plugins/autoloader/prism-autoloader.min.js" integrity="sha512-zc7WDnCM3aom2EziyDIRAtQg1mVXLdILE09Bo+aE1xk0AM2c2cVLfSW9NrxE5tKTX44WBY0Z2HClZ05ur9vB6A==" crossorigin="anonymous"></script>
    </body>

@@ -6,10 +6,11 @@ import requests
 import subprocess
 import time
 
+from base64 import b64encode
 from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_talisman import Talisman
 from google.cloud import storage, exceptions
-from hashlib import sha256
+from hashlib import sha256, sha384
 from mimetypes import guess_extension
 from tempfile import NamedTemporaryFile
 from urllib.parse import urljoin, urlparse
@@ -51,7 +52,9 @@ def favicon():
 
 @app.route('/', methods=['GET'])
 def index():
-    return render_template('index.html', title=TITLE, url=URL)
+    css_sri = calculate_sri_on_file(os.path.join(app.root_path, 'static', 'style.css'))
+    js_sri = calculate_sri_on_file(os.path.join(app.root_path, 'static', 'javascript.js'))
+    return render_template('index.html', title=TITLE, url=URL, css_sri=css_sri, js_sri=js_sri)
 
 @app.route('/api', methods=['GET'])
 def api_get():
@@ -166,6 +169,20 @@ def send_avif(f):
     response = send_file(f, mimetype='image/avif', cache_timeout=CACHE_TIMEOUT)
     response.set_etag(sha256sum(f))
     return response
+
+def calculate_sri_on_file(filename):
+    """Calculate SRI string."""
+    buf_size = 65536
+    hash = sha384()
+    with open(filename, 'rb') as f:
+        while True:
+            data = f.read(buf_size)
+            if not data:
+                break
+            hash.update(data)
+    hash = hash.digest()
+    hash_base64 = b64encode(hash).decode()
+    return 'sha384-{}'.format(hash_base64)
 
 def sha256sum(filename):
     h  = sha256()
