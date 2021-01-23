@@ -15,6 +15,7 @@ from hashlib import sha256, sha384
 from mimetypes import guess_extension
 from tempfile import NamedTemporaryFile
 from urllib.parse import urljoin, urlparse
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 CACHE_TIMEOUT = int(os.environ.get('CACHE_TIMEOUT', 43200))
 FORCE_HTTPS = bool(os.environ.get('FORCE_HTTPS', ''))
@@ -23,6 +24,8 @@ GET_MAX_SIZE = int(os.environ.get('GET_MAX_SIZE', 20*1024*1024))
 REMOTE_REQUEST_TIMEOUT = float(os.environ.get('REMOTE_REQUEST_TIMEOUT', 10.0))
 TITLE = os.environ.get('TITLE', 'AVIF Converter')
 URL = os.environ.get('URL', 'https://example.com/')
+X_FOR = int(os.environ.get('X_FOR', 0))
+X_PROTO = int(os.environ.get('X_PROTO', 0))
 
 # "image/*" are always supported.
 SUPPORTED_MIMES = ['application/octet-stream', 'application/pdf']
@@ -37,6 +40,7 @@ csp = {
     ]
 }
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=X_FOR, x_proto=X_PROTO)
 talisman = Talisman(
     app,
     content_security_policy=csp,
@@ -82,7 +86,7 @@ def api_get():
                 logging.info('Cache hit URL: {}/{}'.format(GCP_BUCKET, url_hash))
                 data_hash = tempf.read()
                 data_hash = data_hash.decode('utf-8')
-                return redirect(url_for('avif_get', image=data_hash+'.avif'))
+                return redirect(url_for('avif_get', image=data_hash))
             except exceptions.NotFound:
                 logging.info('Cache miss URL: {}/{}'.format(GCP_BUCKET, url_hash))
 
@@ -119,15 +123,15 @@ def api_post():
         f.save(tempf.name)
         return avif_convert(tempf.name)
 
-@app.route('/i/<image>', methods=['GET'])
+@app.route('/<image>', methods=['GET'])
 def avif_get(image):
     if len(request.args) > 0 or not GCP_BUCKET:
         abort(404)
-    image_pattern = re.compile(r'^([0-9a-f]{64}).avif$')
+    image_pattern = re.compile(r'^[0-9a-f]{64}.avif$')
     match = re.search(image_pattern, image)
     if not match:
         abort(404)
-    data_hash = match.group(1)
+    data_hash = match.group(0)
     with NamedTemporaryFile() as tempf:
         try:
             download_blob(GCP_BUCKET, data_hash, tempf.name)
@@ -138,7 +142,7 @@ def avif_get(image):
 def avif_convert(tempf_in, url_hash=None):
     logging.info('Input file size: %d', os.path.getsize(tempf_in))
     if GCP_BUCKET:
-        data_hash = sha256sum(tempf_in)
+        data_hash = sha256sum(tempf_in) + '.avif'
         if blob_exists(GCP_BUCKET, data_hash):
             logging.info('Cache hit data: {}/{}'.format(GCP_BUCKET, data_hash))
             if url_hash:
@@ -146,7 +150,7 @@ def avif_convert(tempf_in, url_hash=None):
                     tempf.write(data_hash.encode('utf-8'))
                     tempf.flush()
                     upload_blob(GCP_BUCKET, tempf.name, url_hash)
-            return redirect(url_for('avif_get', image=data_hash+'.avif'))
+            return redirect(url_for('avif_get', image=data_hash))
         else:
             logging.info('Cache miss data: {}/{}'.format(GCP_BUCKET, data_hash))
     with NamedTemporaryFile(suffix='.avif') as tempf:
@@ -173,7 +177,7 @@ def avif_convert(tempf_in, url_hash=None):
                         tempf_url.write(data_hash.encode('utf-8'))
                         tempf_url.flush()
                         upload_blob(GCP_BUCKET, tempf_url.name, url_hash)
-                return redirect(url_for('avif_get', image=data_hash+'.avif'))
+                return redirect(url_for('avif_get', image=data_hash))
             except exceptions.NotFound:
                 logging.error('Could not update cache: {}/{}'.format(GCP_BUCKET, data_hash))
         return send_avif(tempf_out)
@@ -257,14 +261,13 @@ def update_blob_custom_time(bucket_name, blob_name):  # pragma: no cover
     # bucket_name = "your-bucket-name"
     # blob_name = "storage-object-name"
 
-    d = datetime.datetime.utcnow()
-    metadata = {'Custom-Time': d.isoformat('T')+'Z'}
+    now = datetime.datetime.utcnow()
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.get_blob(blob_name)
-    blob.metadata = metadata
+    blob.custom_time = now
     blob.patch()
 
-    logging.debug("The metadata for the blob {} is {}".format(blob.name, blob.metadata))
+    logging.debug("The Custom-Time for the blob {} is {}".format(blob.name, blob.custom_time))
 
 def blob_exists(bucket_name, blob_name):  # pragma: no cover
     """Check if a blob exists in a bucket."""

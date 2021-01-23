@@ -132,7 +132,7 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
         self.assertEqual(response.data, temp_data)
-        self.cache['-testing-'+TEST_NET_JPG_HASH] = 'FAKEDATA'.encode('utf-8')
+        self.cache['-testing-'+TEST_NET_JPG_HASH+'.avif'] = 'FAKEDATA'.encode('utf-8')
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_JPG)), follow_redirects=True)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, 'FAKEDATA'.encode('utf-8'))
@@ -159,11 +159,11 @@ class SmokeTests(unittest.TestCase):
         quoted_url = urllib.parse.quote(TEST_NET_PNG)
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(URL+'api?url='+quoted_url)))
         self.assertEqual(response.status_code, 400)
-        response = self.app.get('/i/{}.avif'.format(TEST_NET_JPG_HASH))
+        response = self.app.get('/{}.avif'.format(TEST_NET_JPG_HASH))
         self.assertEqual(response.status_code, 404)
-        response = self.app.get('/i/{}.avif?invalid'.format(TEST_NET_JPG_HASH))
+        response = self.app.get('/{}.avif?invalid'.format(TEST_NET_JPG_HASH))
         self.assertEqual(response.status_code, 404)
-        response = self.app.get('/i/invalid.avif')
+        response = self.app.get('/invalid.avif')
         self.assertEqual(response.status_code, 404)
 
     def test_sha256sum(self):
