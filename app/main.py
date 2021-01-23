@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 import pathlib
@@ -52,6 +53,8 @@ def favicon():
 
 @app.route('/', methods=['GET'])
 def index():
+    if len(request.args) > 0:
+        abort(404)
     css_sri = calculate_sri_on_file(os.path.join(app.root_path, 'static', 'style.css'))
     js_sri = calculate_sri_on_file(os.path.join(app.root_path, 'static', 'javascript.js'))
     return render_template('index.html', title=TITLE, url=URL, css_sri=css_sri, js_sri=js_sri)
@@ -59,15 +62,11 @@ def index():
 @app.route('/api', methods=['GET'])
 def api_get():
     url_hash = None
-    url_hash_pattern = re.compile(r'^[0-9a-f]{64}$')
 
     url = request.args.get('url')
     if not isinstance(url, str) or len(request.args) != 1:
         abort(400)
-
-    match = re.search(url_hash_pattern, url)
-    if not match \
-        and not url.startswith('https://') \
+    if not url.startswith('https://') \
         and not url.startswith('http://'):
         abort(400)
 
@@ -76,20 +75,17 @@ def api_get():
         abort(400)
 
     if GCP_BUCKET:
-        if match:
-            url_hash = match.group(0)
-        else:
-            url_hash = sha256(url.encode('utf-8')).hexdigest()
+        url_hash = sha256(url.encode('utf-8')).hexdigest()
         with NamedTemporaryFile() as tempf:
             try:
                 download_blob(GCP_BUCKET, url_hash, tempf.name)
                 logging.info('Cache hit URL: {}/{}'.format(GCP_BUCKET, url_hash))
-                return send_avif(tempf.name)
+                data_hash = tempf.read()
+                data_hash = data_hash.decode('utf-8')
+                return redirect(url_for('avif_get', image=data_hash+'.avif'))
             except exceptions.NotFound:
                 logging.info('Cache miss URL: {}/{}'.format(GCP_BUCKET, url_hash))
 
-    if match:
-        abort(404)
     try:
         r = requests.head(url, timeout=REMOTE_REQUEST_TIMEOUT)
         content_type = r.headers.get('Content-Type')
@@ -123,21 +119,36 @@ def api_post():
         f.save(tempf.name)
         return avif_convert(tempf.name)
 
+@app.route('/i/<image>', methods=['GET'])
+def avif_get(image):
+    if len(request.args) > 0 or not GCP_BUCKET:
+        abort(404)
+    image_pattern = re.compile(r'^([0-9a-f]{64}).avif$')
+    match = re.search(image_pattern, image)
+    if not match:
+        abort(404)
+    data_hash = match.group(1)
+    with NamedTemporaryFile() as tempf:
+        try:
+            download_blob(GCP_BUCKET, data_hash, tempf.name)
+            return send_avif(tempf.name)
+        except exceptions.NotFound:
+            abort(404)
+
 def avif_convert(tempf_in, url_hash=None):
     logging.info('Input file size: %d', os.path.getsize(tempf_in))
     if GCP_BUCKET:
         data_hash = sha256sum(tempf_in)
-        with NamedTemporaryFile() as tempf:
-            try:
-                download_blob(GCP_BUCKET, data_hash, tempf.name)
-                logging.info('Cache hit data: {}/{}'.format(GCP_BUCKET, data_hash))
-                if url_hash:
+        if blob_exists(GCP_BUCKET, data_hash):
+            logging.info('Cache hit data: {}/{}'.format(GCP_BUCKET, data_hash))
+            if url_hash:
+                with NamedTemporaryFile() as tempf:
+                    tempf.write(data_hash.encode('utf-8'))
+                    tempf.flush()
                     upload_blob(GCP_BUCKET, tempf.name, url_hash)
-                else:
-                    return redirect(url_for('api_get', url=data_hash))
-                return send_avif(tempf.name)
-            except exceptions.NotFound:
-                logging.info('Cache miss data: {}/{}'.format(GCP_BUCKET, data_hash))
+            return redirect(url_for('avif_get', image=data_hash+'.avif'))
+        else:
+            logging.info('Cache miss data: {}/{}'.format(GCP_BUCKET, data_hash))
     with NamedTemporaryFile(suffix='.avif') as tempf:
         tempf_out = tempf.name
         result = subprocess.run(['identify', '-format', '%[magick]', tempf_in], capture_output=True, text=True)
@@ -158,9 +169,11 @@ def avif_convert(tempf_in, url_hash=None):
             try:
                 upload_blob(GCP_BUCKET, tempf_out, data_hash)
                 if url_hash:
-                    upload_blob(GCP_BUCKET, tempf_out, url_hash)
-                else:
-                    return redirect(url_for('api_get', url=data_hash))
+                    with NamedTemporaryFile() as tempf_url:
+                        tempf_url.write(data_hash.encode('utf-8'))
+                        tempf_url.flush()
+                        upload_blob(GCP_BUCKET, tempf_url.name, url_hash)
+                return redirect(url_for('avif_get', image=data_hash+'.avif'))
             except exceptions.NotFound:
                 logging.error('Could not update cache: {}/{}'.format(GCP_BUCKET, data_hash))
         return send_avif(tempf_out)
@@ -215,7 +228,7 @@ def download_blob(bucket_name, source_blob_name, destination_file_name):  # prag
     # using `Bucket.blob` is preferred here.
     blob = bucket.blob(source_blob_name)
     blob.download_to_filename(destination_file_name)
-
+    update_blob_custom_time(bucket_name, source_blob_name)
     logging.debug(
         "Blob {} downloaded to {}.".format(
             source_blob_name, destination_file_name
@@ -232,12 +245,34 @@ def upload_blob(bucket_name, source_file_name, destination_blob_name):  # pragma
     blob = bucket.blob(destination_blob_name)
 
     blob.upload_from_filename(source_file_name)
-
+    update_blob_custom_time(bucket_name, destination_blob_name)
     logging.debug(
         "File {} uploaded to {}.".format(
             source_file_name, destination_blob_name
         )
     )
+
+def update_blob_custom_time(bucket_name, blob_name):  # pragma: no cover
+    """Update a blob's Custom-Time metadata."""
+    # bucket_name = "your-bucket-name"
+    # blob_name = "storage-object-name"
+
+    d = datetime.datetime.utcnow()
+    metadata = {'Custom-Time': d.isoformat('T')+'Z'}
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.get_blob(blob_name)
+    blob.metadata = metadata
+    blob.patch()
+
+    logging.debug("The metadata for the blob {} is {}".format(blob.name, blob.metadata))
+
+def blob_exists(bucket_name, blob_name):  # pragma: no cover
+    """Check if a blob exists in a bucket."""
+    # bucket_name = "your-bucket-name"
+    # blob_name = "storage-object-name"
+
+    bucket = storage_client.bucket(bucket_name)
+    return storage.Blob(bucket=bucket, name=blob_name).exists(storage_client)
 
 if __name__ == '__main__':  # pragma: no cover
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))

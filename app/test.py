@@ -63,16 +63,24 @@ class SmokeTests(unittest.TestCase):
         with open(source_file_name, 'rb') as f:
             self.cache[key] = f.read()
 
+    def blob_exists(self, bucket_name, blob_name):
+        key = bucket_name + blob_name
+        return key in self.cache
+
     def test_main_page(self):
         response = self.app.get('/')
         self.assertEqual(response.status_code, 200)
         response = self.app.get('/favicon.ico')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/vnd.microsoft.icon')
+        response = self.app.get('/?test')
+        self.assertEqual(response.status_code, 404)
 
+    @patch('main.blob_exists')
     @patch('main.upload_blob', side_effect=exceptions.NotFound('Test'))
     @patch('main.download_blob', side_effect=exceptions.NotFound('Test'))
-    def test_api_post(self, mock_dl, mock_ul):
+    def test_api_post(self, mock_dl, mock_ul, mock_be):
+        mock_be.side_effect = self.blob_exists
         response = self.app.post('/api', data={'file': open(TEST_LOCAL_PNG, 'rb')})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
@@ -83,14 +91,12 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
         self.assertTrue(is_avif(response.data))
-        response = self.app.post('/api', data={'file': open(TEST_LOCAL_PNG, 'rb')}, follow_redirects=True)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
-        self.assertTrue(is_avif(response.data))
 
+    @patch('main.blob_exists')
     @patch('main.upload_blob', side_effect=exceptions.NotFound('Test'))
     @patch('main.download_blob', side_effect=exceptions.NotFound('Test'))
-    def test_api_get(self, mock_dl, mock_ul):
+    def test_api_get(self, mock_dl, mock_ul, mock_be):
+        mock_be.side_effect = self.blob_exists
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_PNG)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
@@ -118,22 +124,24 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.data, r.content)
         mock_dl.side_effect = self.download_blob
         mock_ul.side_effect = self.upload_blob
-        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_BMP)))
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_BMP)), follow_redirects=True)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
         temp_data = response.data
-        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_BMP)))
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_BMP)), follow_redirects=True)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
         self.assertEqual(response.data, temp_data)
-        self.cache['-testing-'+TEST_NET_JPG_HASH] = 'FAKEDATA'.encode()
-        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_JPG)))
+        self.cache['-testing-'+TEST_NET_JPG_HASH] = 'FAKEDATA'.encode('utf-8')
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_JPG)), follow_redirects=True)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data, 'FAKEDATA'.encode())
+        self.assertEqual(response.data, 'FAKEDATA'.encode('utf-8'))
 
+    @patch('main.blob_exists')
     @patch('main.upload_blob', side_effect=exceptions.NotFound('Test'))
     @patch('main.download_blob', side_effect=exceptions.NotFound('Test'))
-    def test_api_invalid_requests(self, mock_dl, mock_ul):
+    def test_api_invalid_requests(self, mock_dl, mock_ul, mock_be):
+        mock_be.side_effect = self.blob_exists
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_NOT_IMAGE)))
         self.assertEqual(response.status_code, 400)
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_TOO_BIG)))
@@ -151,7 +159,11 @@ class SmokeTests(unittest.TestCase):
         quoted_url = urllib.parse.quote(TEST_NET_PNG)
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(URL+'api?url='+quoted_url)))
         self.assertEqual(response.status_code, 400)
-        response = self.app.get('/api?url={}'.format(TEST_NET_JPG_HASH))
+        response = self.app.get('/i/{}.avif'.format(TEST_NET_JPG_HASH))
+        self.assertEqual(response.status_code, 404)
+        response = self.app.get('/i/{}.avif?invalid'.format(TEST_NET_JPG_HASH))
+        self.assertEqual(response.status_code, 404)
+        response = self.app.get('/i/invalid.avif')
         self.assertEqual(response.status_code, 404)
 
     def test_sha256sum(self):
@@ -172,7 +184,7 @@ class SmokeTests(unittest.TestCase):
     def test_sri(self):
         with NamedTemporaryFile() as tempf:
             val1 = calculate_sri_on_file(tempf.name)
-            tempf.write(TEST_STRING.encode())
+            tempf.write(TEST_STRING.encode('utf-8'))
             tempf.flush()
             val2 = calculate_sri_on_file(tempf.name)
         self.assertEqual(val1, EMPTY_FILE_SRI)
