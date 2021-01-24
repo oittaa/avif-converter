@@ -14,7 +14,8 @@ footer{
     left:0;
     bottom:0;
     height:30px;
-    width:100%
+    width:100%;
+    padding-left:10px
 }
 .btn{
     background-color:#4169e1;
@@ -63,6 +64,29 @@ footer{
 .wrapper .file-upload:hover{
     background-position:0 -100%;
     color:#2590eb
+}
+.tooltip {
+    position:relative;
+    display:inline-block;
+ } 
+.tooltip .tooltiptext {
+    width:300px;
+    visibility: hidden;
+    background-color:#fff;
+    color:#000;
+    border-radius:6px;
+    padding:5px;
+    position:absolute;
+    z-index:1;
+    bottom:100%;
+    left:105%;
+    /* Fade in tooltip - takes 1 second to go from 0% to 100% opac: */
+    opacity: 0;
+    transition: opacity 1s;
+}
+.tooltip:hover .tooltiptext {
+    visibility:visible;
+    opacity:1;
 }
 .api-info{
     display:none;
