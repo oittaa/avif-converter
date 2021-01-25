@@ -265,9 +265,11 @@ def update_blob_custom_time(bucket_name, blob_name):  # pragma: no cover
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.get_blob(blob_name)
     blob.custom_time = now
-    blob.patch()
-
-    logging.debug("The Custom-Time for the blob {} is {}".format(blob.name, blob.custom_time))
+    try:
+        blob.patch()
+        logging.debug("The Custom-Time for the blob {} is {}".format(blob.name, blob.custom_time))
+    except (exceptions.BadRequest, exceptions.Conflict) as e:
+        logging.error("Could not edit the blob {} - Custom-Time {} - {}".format(blob.name, blob.custom_time, e))
 
 def blob_exists(bucket_name, blob_name):  # pragma: no cover
     """Check if a blob exists in a bucket."""

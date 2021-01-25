@@ -3,6 +3,8 @@ FROM dpokidov/imagemagick:latest-buster
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True
 ENV APP_HOME /app
+ENV GUNICORN_WORKERS 8
+ENV GUNICORN_THREADS 1
 
 RUN apt-get -y update && \
     apt-get install -y python3-pip && \
@@ -22,4 +24,4 @@ RUN convert identify -list format && coverage run --source=./ test.py && coverag
 # For environments with multiple CPU cores, increase the number of workers
 # to be equal to the cores available.
 ENTRYPOINT []
-CMD exec gunicorn --bind :$PORT --workers $(nproc) --threads 8 --timeout 0 main:app
+CMD exec gunicorn --bind :$PORT --workers $GUNICORN_WORKERS --threads $GUNICORN_THREADS --timeout 0 main:app
