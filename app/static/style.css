@@ -1,10 +1,14 @@
  html{
-    height:90%
+    height:90%;
+    margin: 0;
+    padding: 0
 }
 body{
     height:100%;
     background-color:#2590eb;
-    color:#333
+    color:#333;
+    margin: 0;
+    padding: 0
 }
 h1,h2{
     text-align:center
@@ -67,7 +71,7 @@ footer{
 }
 .tooltip {
     position:relative;
-    display:inline-block;
+    display:inline-block
  } 
 .tooltip .tooltiptext {
     width:300px;
@@ -90,7 +94,8 @@ footer{
 }
 .api-info{
     display:none;
-    padding-bottom:2em
+    padding-bottom:2em;
+    margin:2em
 }
 input[type=url]{
     max-width:800px;
@@ -100,4 +105,27 @@ input[type=url]{
     border:1px solid #ccc;
     border-radius:4px;
     box-sizing:border-box
+}
+#spinner-back, #spinner-front {
+  position: fixed;
+  width: 100vw;
+  transition: all 1s;
+  visibility: hidden;
+  opacity: 0
+}
+#spinner-back {
+  z-index: 998;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7)
+}
+#spinner-front {
+  z-index: 999;
+  color: #fff;
+  text-align: center;
+  margin-top: 50vh;
+  transform: translateY(-50%)
+}
+#spinner-back.show, #spinner-front.show {
+  visibility: visible;
+  opacity: 1
 }

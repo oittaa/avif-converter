@@ -10,6 +10,10 @@
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" />
    </head>
    <body>
+      <div id="spinner-back">
+          <div id="spinner-front"><i class="fas fa-spinner fa-spin fa-3x"></i>
+          </div>
+      </div>
       <div class="wrapper">
          <div class="file-upload">
             <form method="post" id="form1" enctype="multipart/form-data" action="{{ url_for('api_post') }}">
@@ -21,7 +25,7 @@
       <div class="wrapper">
           <form method="get" id="form2" action="{{ url_for('api_get') }}">
              <input autofocus type="url" name="url" id="url" placeholder="https://..." autocomplete="off">
-             <input class="btn" type="submit" value="Go">
+             <input class="btn" id="submit" type="submit" value="Go">
           </form>
       </div>
       <h1><a href="#" id="api">API</a></h1>
