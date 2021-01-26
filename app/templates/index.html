@@ -9,6 +9,11 @@
       <meta property="og:type" content="website" />
       <meta property="og:url" content="{{ url_for('index', _external=True) }}" />
       <meta property="og:image" content="{{ url_for('static', filename='tux.png', _external=True) }}" />
+      <link rel="icon" type="image/png" sizes="192x192"  href="{{ url_for('static', filename='favicon-192x192.png') }}" />
+      <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}" />
+      <link rel="icon" type="image/png" sizes="96x96" href="{{ url_for('static', filename='favicon-96x96.png') }}" />
+      <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}" />
+      <meta name="theme-color" content="#2590eb" />
       <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" />
       <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?{{ css_sri|urlencode }}" integrity="{{ css_sri }}" />
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" integrity="sha512-HK5fgLBL+xu6dm/Ii3z4xhlSUyZgTT9tuc/hSrtw6uzJOvgRr2a9jyxxT1ely+B+xFAmJKVSTbpM/CuL7qxO8w==" crossorigin="anonymous" />
