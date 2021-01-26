@@ -87,7 +87,8 @@ def api_get():
                 logging.info('Cache hit URL: {}/{}'.format(GCP_BUCKET, url_hash))
                 data_hash = tempf.read()
                 data_hash = data_hash.decode('utf-8')
-                return redirect(url_for('avif_get', image=data_hash))
+                if blob_exists(GCP_BUCKET, data_hash):
+                    return redirect(url_for('avif_get', image=data_hash))
             except exceptions.NotFound:
                 logging.info('Cache miss URL: {}/{}'.format(GCP_BUCKET, url_hash))
 
