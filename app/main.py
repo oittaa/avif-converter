@@ -23,7 +23,7 @@ GCP_BUCKET = os.environ.get('GCP_BUCKET')
 GET_MAX_SIZE = int(os.environ.get('GET_MAX_SIZE', 20*1024*1024))
 REMOTE_REQUEST_TIMEOUT = float(os.environ.get('REMOTE_REQUEST_TIMEOUT', 10.0))
 TITLE = os.environ.get('TITLE', 'AVIF Converter')
-URL = os.environ.get('URL', 'https://example.com/')
+URL = os.environ.get('URL')
 X_FOR = int(os.environ.get('X_FOR', 0))
 X_PROTO = int(os.environ.get('X_PROTO', 0))
 
@@ -61,7 +61,7 @@ def index():
         abort(404)
     css_sri = calculate_sri_on_file(os.path.join(app.root_path, 'static', 'style.css'))
     js_sri = calculate_sri_on_file(os.path.join(app.root_path, 'static', 'javascript.js'))
-    return render_template('index.html', title=TITLE, url=URL, css_sri=css_sri, js_sri=js_sri)
+    return render_template('index.html', title=TITLE, css_sri=css_sri, js_sri=js_sri)
 
 @app.route('/api', methods=['GET'])
 def api_get():
@@ -75,7 +75,8 @@ def api_get():
         abort(400)
 
     # Recursive query
-    if url.startswith(urljoin(URL, url_for('api_get'))):
+    if url.startswith(url_for('api_get', _external=True)) \
+        or URL and url.startswith(urljoin(URL, url_for('api_get'))):
         abort(400)
 
     if GCP_BUCKET:

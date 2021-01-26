@@ -4,6 +4,11 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>{{ title }}</title>
+      <meta property="og:title" content="{{ title }}" />
+      <meta property="og:description" content="Convert images to AVIF. The AV1 Image File Format, or AVIF, is a modern image format, which generally has better compression than WebP, JPEG, PNG and GIF and is designed to supersede them." />
+      <meta property="og:type" content="website" />
+      <meta property="og:url" content="{{ url_for('index', _external=True) }}" />
+      <meta property="og:image" content="{{ url_for('static', filename='tux.png', _external=True) }}" />
       <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" />
       <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?{{ css_sri|urlencode }}" integrity="{{ css_sri }}" />
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" integrity="sha512-HK5fgLBL+xu6dm/Ii3z4xhlSUyZgTT9tuc/hSrtw6uzJOvgRr2a9jyxxT1ely+B+xFAmJKVSTbpM/CuL7qxO8w==" crossorigin="anonymous" />
@@ -33,7 +38,7 @@
          <h2>Python</h2>
          <pre><code class="language-python">import requests
 
-api_url = '{{ url }}api'
+api_url = '{{ url_for('api_post', _external=True) }}'
 input_file = '/path/to/image.jpg'
 output_file = '/path/to/image.avif'
 
@@ -46,8 +51,8 @@ else:
     <br>
     <pre><code class="language-python">import requests
 
-api_url = '{{ url }}api'
-input_url = '{{ url }}static/tux.png'
+api_url = '{{ url_for('api_get', _external=True) }}'
+input_url = '{{ url_for('static', filename='tux.png', _external=True) }}'
 output_file = '/path/to/tux.avif'
 
 r = requests.get(api_url, params={'url': input_url})
@@ -58,12 +63,12 @@ else:
     print('error')</code></pre>
 
          <h2>Shell</h2>
-         <pre><code class="language-shell">curl --output /path/to/image.avif -L -F "file=@/path/to/image.jpg" {{ url }}api</code></pre>
+         <pre><code class="language-shell">curl --output /path/to/image.avif -L -F "file=@/path/to/image.jpg" {{ url_for('api_post', _external=True) }}</code></pre>
 
          <h2>HTML</h2>
          <pre><code class="language-html">&lt;picture&gt;
-    &lt;source srcset="{{ url }}api?url={{ url|urlencode }}static/tux.png" type="image/avif"&gt;
-    &lt;img src="{{ url }}static/tux.png" alt="tux"&gt;
+    &lt;source srcset="{% set img_url = url_for('static', filename='tux.png', _external=True) %}{{ url_for('api_get', url=img_url|safe, _external=True) }}" type="image/avif"&gt;
+    &lt;img src="{{ url_for('static', filename='tux.png', _external=True) }}" alt="tux"&gt;
 &lt;/picture&gt;</code></pre>
     
       </div>

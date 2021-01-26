@@ -4,7 +4,7 @@ import unittest
 import urllib
 
 from google.cloud import exceptions
-from main import app, calculate_sri_on_file, get_extension, sha256sum, URL
+from main import app, calculate_sri_on_file, get_extension, sha256sum
 from tempfile import NamedTemporaryFile
 from unittest.mock import patch
 
@@ -25,6 +25,7 @@ TEST_NET_TOO_BIG = TEST_NET_URL + 'test_50mb.jpg'
 EMPTY_FILE_SRI = 'sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb'  # echo -n "" | openssl dgst -sha384 -binary | openssl base64 -A
 TEST_STRING = 'alert(\'Hello, world.\');'
 TEST_STRING_SRI = 'sha384-H8BRh8j48O9oYatfu5AZzq6A9RINhZO5H16dQZngK7T62em8MUt1FLm52t+eX6xO'  # echo -n "alert('Hello, world.');" | openssl dgst -sha384 -binary | openssl base64 -A
+TEST_BASE_URL = 'https://www.example.com/'
 
 def is_avif(data):
     """Checks if data is AVIF."""
@@ -45,6 +46,7 @@ def is_avif(data):
 # bottom up.
 
 @patch('main.GCP_BUCKET', '-testing-')
+@patch('main.URL', TEST_BASE_URL)
 class SmokeTests(unittest.TestCase):
     def setUp(self):
         self.cache = {}
@@ -157,7 +159,7 @@ class SmokeTests(unittest.TestCase):
         response = self.app.get('/api?invalid=1&url={}'.format(urllib.parse.quote(TEST_NET_PNG)))
         self.assertEqual(response.status_code, 400)
         quoted_url = urllib.parse.quote(TEST_NET_PNG)
-        response = self.app.get('/api?url={}'.format(urllib.parse.quote(URL+'api?url='+quoted_url)))
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_BASE_URL+'api?url='+quoted_url)))
         self.assertEqual(response.status_code, 400)
         response = self.app.get('/{}.avif'.format(TEST_NET_JPG_HASH))
         self.assertEqual(response.status_code, 404)
