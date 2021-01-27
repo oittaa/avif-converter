@@ -102,9 +102,9 @@ def api_get():
             abort(406)
         logging.info('Fetching URL: %s', url)
         r = requests.get(url, timeout=REMOTE_REQUEST_TIMEOUT)
-    except requests.exceptions.RequestException as e:
+    except requests.exceptions.RequestException:
         abort(400)
-    if r.status_code != requests.codes.ok:
+    if r.status_code != requests.codes.ok: #pylint: disable=no-member
         abort(400)
     ext = guess_extension(content_type)
     if not ext or ext == '.a':
@@ -215,7 +215,7 @@ def sha256sum(filename):
 
 def get_extension(path, max_length=16):
     """Extract an extension from a path without possibly dangerous characters."""
-    pattern = re.compile('[\W]+')
+    pattern = re.compile(r'[\W]+')
     ext =  pathlib.Path(path).suffix
     ext = pattern.sub('', ext)
     if ext:
