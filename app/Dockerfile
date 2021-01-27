@@ -8,7 +8,7 @@ ENV GUNICORN_THREADS 1
 
 RUN apt-get -y update && \
     apt-get install -y python3-pip && \
-    pip3 install Flask coverage flask-talisman google-cloud-storage gunicorn requests && \
+    pip3 install Flask coverage flask-talisman google-cloud-storage gunicorn pylint requests && \
     apt-get remove --autoremove --purge -y build-essential '*-dev' && \
     rm -rf /var/lib/apt/lists/*
 
@@ -17,7 +17,8 @@ WORKDIR $APP_HOME
 COPY main.py test.py ./
 COPY static/ ./static/
 COPY templates/ ./templates/
-RUN convert identify -list format && coverage run --source=./ test.py && coverage report -m
+RUN convert identify -list format && pylint main.py && \
+    coverage run --source=./ --omit=test.py test.py && coverage report -m
 
 # Run the web service on container startup. Here we use the gunicorn
 # webserver, with one worker process and 8 threads.

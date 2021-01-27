@@ -1,20 +1,25 @@
+"""This app converts images to AV1 Image File Format (AVIF)."""
+
 import datetime
 import logging
 import os
 import pathlib
 import re
-import requests
 import subprocess
 import time
 
 from base64 import b64encode
-from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory, url_for
-from flask_talisman import Talisman
-from google.cloud import storage, exceptions
 from hashlib import sha256, sha384
 from mimetypes import guess_extension
 from tempfile import NamedTemporaryFile
 from urllib.parse import urljoin, urlparse
+
+import requests
+
+from flask import Flask, abort, redirect, render_template, request, send_file, \
+    send_from_directory, url_for
+from flask_talisman import Talisman
+from google.cloud import storage, exceptions
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 CACHE_TIMEOUT = int(os.environ.get('CACHE_TIMEOUT', 43200))
@@ -52,11 +57,13 @@ if GCP_BUCKET:  # pragma: no cover
 
 @app.route('/favicon.ico')
 def favicon():
+    """Sends legacy favicon."""
     return send_from_directory(os.path.join(app.root_path, 'static'),
                                'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 @app.route('/', methods=['GET'])
 def index():
+    """Shows the main page."""
     if len(request.args) > 0:
         abort(404)
     css_sri = calculate_sri_on_file(os.path.join(app.root_path, 'static', 'style.css'))
@@ -65,6 +72,7 @@ def index():
 
 @app.route('/api', methods=['GET'])
 def api_get():
+    """An API endpoint for GET requests."""
     url_hash = None
 
     url = request.args.get('url')
@@ -84,49 +92,52 @@ def api_get():
         with NamedTemporaryFile() as tempf:
             try:
                 download_blob(GCP_BUCKET, url_hash, tempf.name)
-                logging.info('Cache hit URL: {}/{}'.format(GCP_BUCKET, url_hash))
+                logging.info('Cache hit URL: %s/%s', GCP_BUCKET, url_hash)
                 data_hash = tempf.read()
                 data_hash = data_hash.decode('utf-8')
                 if blob_exists(GCP_BUCKET, data_hash):
                     return redirect(url_for('avif_get', image=data_hash))
             except exceptions.NotFound:
-                logging.info('Cache miss URL: {}/{}'.format(GCP_BUCKET, url_hash))
+                logging.info('Cache miss URL: %s/%s', GCP_BUCKET, url_hash)
 
     try:
-        r = requests.head(url, timeout=REMOTE_REQUEST_TIMEOUT)
-        content_type = r.headers.get('Content-Type')
-        if not isinstance(content_type, str) or (not content_type.startswith('image/') and not content_type in SUPPORTED_MIMES):
+        response = requests.head(url, timeout=REMOTE_REQUEST_TIMEOUT)
+        content_type = response.headers.get('Content-Type')
+        if not isinstance(content_type, str) or (not content_type.startswith('image/') \
+            and not content_type in SUPPORTED_MIMES):
             abort(400)
-        content_length = r.headers.get('Content-Length')
+        content_length = response.headers.get('Content-Length')
         if isinstance(content_length, str) and int(content_length) > GET_MAX_SIZE:
             abort(406)
         logging.info('Fetching URL: %s', url)
-        r = requests.get(url, timeout=REMOTE_REQUEST_TIMEOUT)
+        response = requests.get(url, timeout=REMOTE_REQUEST_TIMEOUT)
     except requests.exceptions.RequestException:
         abort(400)
-    if r.status_code != requests.codes.ok: #pylint: disable=no-member
+    if response.status_code != requests.codes.ok: #pylint: disable=no-member
         abort(400)
     ext = guess_extension(content_type)
     if not ext or ext == '.a':
         path = urlparse(url).path
         ext = get_extension(path)
     with NamedTemporaryFile(suffix=ext) as tempf:
-        tempf.write(r.content)
+        tempf.write(response.content)
         return avif_convert(tempf.name, url_hash)
 
 @app.route('/api', methods=['POST'])
 def api_post():
+    """An API endpoint for POST requests."""
     # check if the post request has the file part
     if 'file' not in request.files:
         abort(400)
-    f = request.files['file']
-    ext = get_extension(f.filename)
+    file = request.files['file']
+    ext = get_extension(file.filename)
     with NamedTemporaryFile(suffix=ext) as tempf:
-        f.save(tempf.name)
+        file.save(tempf.name)
         return avif_convert(tempf.name)
 
 @app.route('/<image>', methods=['GET'])
 def avif_get(image):
+    """Fetches an image from a cache."""
     if len(request.args) > 0 or not GCP_BUCKET:
         abort(404)
     image_pattern = re.compile(r'^[0-9a-f]{64}.avif$')
@@ -142,35 +153,43 @@ def avif_get(image):
             abort(404)
 
 def avif_convert(tempf_in, url_hash=None):
+    """Convert an image to AVIF. If a cache is available, forwards to 'avif_get' function."""
     logging.info('Input file size: %d', os.path.getsize(tempf_in))
     if GCP_BUCKET:
         data_hash = sha256sum(tempf_in) + '.avif'
         if blob_exists(GCP_BUCKET, data_hash):
-            logging.info('Cache hit data: {}/{}'.format(GCP_BUCKET, data_hash))
+            logging.info('Cache hit data: %s/%s', GCP_BUCKET, data_hash)
             if url_hash:
                 with NamedTemporaryFile() as tempf:
                     tempf.write(data_hash.encode('utf-8'))
                     tempf.flush()
-                    upload_blob(GCP_BUCKET, tempf.name, url_hash)
+                    try:
+                        upload_blob(GCP_BUCKET, tempf.name, url_hash)
+                    except exceptions.NotFound:
+                        logging.error('Could not update cache: %s/%s', GCP_BUCKET, url_hash)
             return redirect(url_for('avif_get', image=data_hash))
-        else:
-            logging.info('Cache miss data: {}/{}'.format(GCP_BUCKET, data_hash))
+        logging.info('Cache miss data: %s/%s', GCP_BUCKET, data_hash)
     with NamedTemporaryFile(suffix='.avif') as tempf:
         tempf_out = tempf.name
-        result = subprocess.run(['identify', '-format', '%[magick]', tempf_in], capture_output=True, text=True)
-        mime = result.stdout
+        try:
+            result = subprocess.run(['identify', '-format', '%[magick]', tempf_in], \
+                capture_output=True, check=True, text=True)
+            mime = result.stdout
+        except subprocess.CalledProcessError:
+            mime = ''
         if mime == 'AVIF':
             logging.info('Using original AVIF')
             tempf_out = tempf_in
         else:
-            logging.info('Converting {} to AVIF'.format(mime))
+            logging.info('Converting %s to AVIF', mime)
             start = time.perf_counter()
-            result = subprocess.run(['convert', tempf_in+'[0]', 'avif:'+tempf_out])
-            logging.info('Encoding time: {:.4f}'.format(time.perf_counter() - start))
-            if result.returncode != 0:
-                logging.error('Could not convert {} to AVIF'.format(mime))
+            try:
+                result = subprocess.run(['convert', tempf_in+'[0]', 'avif:'+tempf_out], check=True)
+            except subprocess.CalledProcessError:
+                logging.error('Could not convert %s to AVIF', mime)
                 abort(400)
-        logging.info('Output file size: %d', os.path.getsize(tempf_out))
+            logging.info('Encoding time: %.4f', time.perf_counter() - start)
+            logging.info('Output file size: %d', os.path.getsize(tempf_out))
         if GCP_BUCKET:
             try:
                 upload_blob(GCP_BUCKET, tempf_out, data_hash)
@@ -181,37 +200,38 @@ def avif_convert(tempf_in, url_hash=None):
                         upload_blob(GCP_BUCKET, tempf_url.name, url_hash)
                 return redirect(url_for('avif_get', image=data_hash))
             except exceptions.NotFound:
-                logging.error('Could not update cache: {}/{}'.format(GCP_BUCKET, data_hash))
+                logging.error('Could not update cache: %s/%s', GCP_BUCKET, data_hash)
         return send_avif(tempf_out)
 
-def send_avif(f):
-    response = send_file(f, mimetype='image/avif', cache_timeout=CACHE_TIMEOUT)
-    response.set_etag(sha256sum(f))
+def send_avif(file):
+    """Sends the file with an AVIF MIME type and sets an ETag."""
+    response = send_file(file, mimetype='image/avif', cache_timeout=CACHE_TIMEOUT)
+    response.set_etag(sha256sum(file))
     return response
 
 def calculate_sri_on_file(filename):
     """Calculate SRI string."""
     buf_size = 65536
-    hash = sha384()
-    with open(filename, 'rb') as f:
+    hash_func = sha384()
+    with open(filename, 'rb') as file:
         while True:
-            data = f.read(buf_size)
+            data = file.read(buf_size)
             if not data:
                 break
-            hash.update(data)
-    hash = hash.digest()
-    hash_base64 = b64encode(hash).decode()
+            hash_func.update(data)
+    hash_digest = hash_func.digest()
+    hash_base64 = b64encode(hash_digest).decode()
     return 'sha384-{}'.format(hash_base64)
 
 def sha256sum(filename):
     """Compute SHA256 message digest from a file."""
-    h  = sha256()
-    b  = bytearray(128*1024)
-    mv = memoryview(b)
-    with open(filename, 'rb', buffering=0) as f:
-        for n in iter(lambda : f.readinto(mv), 0):
-            h.update(mv[:n])
-    return h.hexdigest()
+    hash_func  = sha256()
+    byte_array  = bytearray(128*1024)
+    memory_view = memoryview(byte_array)
+    with open(filename, 'rb', buffering=0) as file:
+        for block in iter(lambda : file.readinto(memory_view), 0):
+            hash_func.update(memory_view[:block])
+    return hash_func.hexdigest()
 
 def get_extension(path, max_length=16):
     """Extract an extension from a path without possibly dangerous characters."""
@@ -237,11 +257,7 @@ def download_blob(bucket_name, source_blob_name, destination_file_name):  # prag
     blob = bucket.blob(source_blob_name)
     blob.download_to_filename(destination_file_name)
     update_blob_custom_time(bucket_name, source_blob_name)
-    logging.debug(
-        "Blob {} downloaded to {}.".format(
-            source_blob_name, destination_file_name
-        )
-    )
+    logging.debug("Blob %s downloaded to %s.", source_blob_name, destination_file_name)
 
 def upload_blob(bucket_name, source_file_name, destination_blob_name):  # pragma: no cover
     """Uploads a file to the bucket."""
@@ -255,10 +271,7 @@ def upload_blob(bucket_name, source_file_name, destination_blob_name):  # pragma
     blob.upload_from_filename(source_file_name)
     update_blob_custom_time(bucket_name, destination_blob_name)
     logging.debug(
-        "File {} uploaded to {}.".format(
-            source_file_name, destination_blob_name
-        )
-    )
+        "File %s uploaded to %s.", source_file_name, destination_blob_name)
 
 def update_blob_custom_time(bucket_name, blob_name):  # pragma: no cover
     """Update a blob's Custom-Time metadata."""
@@ -271,9 +284,10 @@ def update_blob_custom_time(bucket_name, blob_name):  # pragma: no cover
     blob.custom_time = now
     try:
         blob.patch()
-        logging.debug("The Custom-Time for the blob {} is {}".format(blob.name, blob.custom_time))
-    except (exceptions.BadRequest, exceptions.Conflict) as e:
-        logging.error("Could not edit the blob {} - Custom-Time {} - {}".format(blob.name, blob.custom_time, e))
+        logging.debug("The Custom-Time for the blob %s is %s", blob.name, blob.custom_time)
+    except (exceptions.BadRequest, exceptions.Conflict) as error:
+        logging.error("Could not edit the blob %s - Custom-Time %s - %s", \
+            blob.name, blob.custom_time, error)
 
 def blob_exists(bucket_name, blob_name):  # pragma: no cover
     """Check if a blob exists in a bucket."""
