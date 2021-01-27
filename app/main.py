@@ -204,6 +204,7 @@ def calculate_sri_on_file(filename):
     return 'sha384-{}'.format(hash_base64)
 
 def sha256sum(filename):
+    """Compute SHA256 message digest from a file."""
     h  = sha256()
     b  = bytearray(128*1024)
     mv = memoryview(b)
@@ -213,6 +214,7 @@ def sha256sum(filename):
     return h.hexdigest()
 
 def get_extension(path, max_length=16):
+    """Extract an extension from a path without possibly dangerous characters."""
     pattern = re.compile('[\W]+')
     ext =  pathlib.Path(path).suffix
     ext = pattern.sub('', ext)
