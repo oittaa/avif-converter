@@ -9,3 +9,46 @@ This should install all necessary dependencies, including manually building and 
 supported codecs as shared libraries. It will then start a web server attached to port 8080.
 
 *Note: This build process will take a while.*
+
+## Caching with Google Cloud Platform
+
+If you're using the Docker container with [Cloud Run][cloud-run], you can optionally enable caching. This way you don't have to regenerate the same images every time from scratch. [Cloud Storage][cloud-storage] buckets are used as a cache. You can use the following shell script as a template to create a bucket.
+
+```
+#!/bin/sh
+set -e
+
+PROJECT_ID="my-project"
+STORAGE_CLASS="STANDARD"
+BUCKET_LOCATION="US-CENTRAL1"
+BUCKET_NAME="my-cache-bucket"
+DELETE_AFTER_DAYS="7"
+
+# https://cloud.google.com/storage/docs/creating-buckets
+
+gsutil mb -p ${PROJECT_ID} -c ${STORAGE_CLASS} -l ${BUCKET_LOCATION} -b on gs://${BUCKET_NAME}
+
+LIFECYCLE_CONFIG_FILE=$(mktemp --suffix=.json)
+cat > ${LIFECYCLE_CONFIG_FILE} <<EOF
+{"rule": [{"action": {"type": "Delete"}, "condition": {"daysSinceCustomTime": ${DELETE_AFTER_DAYS}}}]}
+EOF
+gsutil lifecycle set ${LIFECYCLE_CONFIG_FILE} gs://${BUCKET_NAME}
+rm -- ${LIFECYCLE_CONFIG_FILE}
+```
+
+Then set `GCP_BUCKET` environment variable to point to the created bucket in your Cloud Run service.
+```
+gcloud run deploy my-cloud-run-service \
+--image=gcr.io/my-project/my-container-image \
+--allow-unauthenticated \
+--concurrency=8 \
+--cpu=4 \
+--memory=8192Mi \
+--set-env-vars=GCP_BUCKET=my-cache-bucket \
+--platform=managed \
+--region=us-central1 \
+--project=my-project
+```
+
+[cloud-run]: https://cloud.google.com/run
+[cloud-storage]: https://cloud.google.com/storage
