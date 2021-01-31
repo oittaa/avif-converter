@@ -125,6 +125,10 @@ class SmokeTests(unittest.TestCase):
         r = requests.get(TEST_NET_AVIF)
         self.assertEqual(response.data, r.content)
         mock_dl.side_effect = self.download_blob
+        self.cache['-testing-'+TEST_NET_JPG_HASH+'.avif'] = 'FAKEDATA'.encode('utf-8')
+        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_JPG)), follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, 'FAKEDATA'.encode('utf-8'))
         mock_ul.side_effect = self.upload_blob
         response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_BMP)), follow_redirects=True)
         self.assertEqual(response.status_code, 200)
@@ -134,10 +138,6 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Content-Type'), 'image/avif')
         self.assertEqual(response.data, temp_data)
-        self.cache['-testing-'+TEST_NET_JPG_HASH+'.avif'] = 'FAKEDATA'.encode('utf-8')
-        response = self.app.get('/api?url={}'.format(urllib.parse.quote(TEST_NET_JPG)), follow_redirects=True)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data, 'FAKEDATA'.encode('utf-8'))
 
     @patch('main.blob_exists')
     @patch('main.upload_blob', side_effect=exceptions.NotFound('Test'))
