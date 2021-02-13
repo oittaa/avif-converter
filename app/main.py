@@ -212,27 +212,22 @@ def send_avif(file):
 
 def calculate_sri_on_file(filename):
     """Calculate SRI string."""
-    buf_size = 65536
-    hash_func = sha384()
-    with open(filename, 'rb') as file:
-        while True:
-            data = file.read(buf_size)
-            if not data:
-                break
-            hash_func.update(data)
-    hash_digest = hash_func.digest()
+    hash_digest = hash_sum(filename, sha384()).digest()
     hash_base64 = b64encode(hash_digest).decode()
     return 'sha384-{}'.format(hash_base64)
 
 def sha256sum(filename):
-    """Compute SHA256 message digest from a file."""
-    hash_func  = sha256()
+    """Compute SHA256 message digest from a file and return it in hex format."""
+    return hash_sum(filename, sha256()).hexdigest()
+
+def hash_sum(filename, hash_func):
+    """Compute message digest from a file."""
     byte_array  = bytearray(128*1024)
     memory_view = memoryview(byte_array)
     with open(filename, 'rb', buffering=0) as file:
         for block in iter(lambda : file.readinto(memory_view), 0):
             hash_func.update(memory_view[:block])
-    return hash_func.hexdigest()
+    return hash_func
 
 def get_extension(path, max_length=16):
     """Extract an extension from a path without possibly dangerous characters."""
