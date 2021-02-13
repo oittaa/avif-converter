@@ -44,7 +44,7 @@ jobs:
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache
     - name: Docker container up
-      run: docker run -d --rm -p 8080:8080 --name avif-converter oittaa/avif-converter
+      run: docker run -d --rm -p 8080:8080 --env PORT=8080 --name avif-converter oittaa/avif-converter
     - name: Wait 10 seconds
       run: sleep 10
     - name: Check running containers
@@ -52,7 +52,7 @@ jobs:
     - name: Check the container web page reachability
       run: curl --output /dev/null -s --retry 10 --retry-connrefused http://localhost:8080/
     - name: Check the container API reachability
-      run: curl --output /dev/null -L -F "file=@test_images/test.png" http://localhost:8080/api
+      run: curl --output /dev/null -s -L -F "file=@test_images/test.png" http://localhost:8080/api
     - name: Check Docker logs
       run: docker logs avif-converter
     - name: Docker container down
