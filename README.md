@@ -1,5 +1,8 @@
 # avif-converter docker image
 
+![CI](https://github.com/oittaa/avif-converter/workflows/CI/badge.svg)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 To build and use avif-converter locally in a Debian Docker container with all dependencies,
 change into `app` directory and run:
 
