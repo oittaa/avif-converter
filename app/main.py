@@ -266,11 +266,12 @@ def upload_blob(bucket_name, source_file_name, destination_blob_name):  # pragma
     # source_file_name = "local/path/to/file"
     # destination_blob_name = "storage-object-name"
 
+    now = datetime.datetime.utcnow()
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(destination_blob_name)
+    blob.custom_time = now
 
     blob.upload_from_filename(source_file_name)
-    update_blob_custom_time(bucket_name, destination_blob_name)
     logging.debug(
         "File %s uploaded to %s.", source_file_name, destination_blob_name)
 
