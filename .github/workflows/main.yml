@@ -62,5 +62,11 @@ jobs:
         run: curl --output /dev/null -s -L -F "file=@test_images/test.png" http://localhost:8080/api
       - name: Check Docker logs
         run: docker logs avif-converter
+      - name: Copy coverage
+        run: docker cp avif-converter:/app/coverage.xml coverage.xml
       - name: Docker container down
         run: docker stop avif-converter
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v1
+        with:
+          flags: unittests

@@ -14,12 +14,11 @@ RUN apt-get -y update && \
 
 # Python app installation
 WORKDIR $APP_HOME
-COPY main.py test.py ./
+COPY main.py test.py coverage.sh ./
 COPY static/ ./static/
 COPY templates/ ./templates/
 RUN convert identify -list format && \
-    coverage run --source=./ --omit=test.py test.py && \
-    coverage report -m
+    ./coverage.sh
 
 # Run the web service on container startup. Here we use the gunicorn
 # webserver, with one worker process and 8 threads.
