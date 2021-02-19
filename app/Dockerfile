@@ -24,8 +24,11 @@ RUN apt-get -y update && \
     libde265-0 libde265-dev libjpeg62-turbo libjpeg62-turbo-dev x265 libx265-dev libtool \
     # IM
     libpng16-16 libpng-dev libjpeg62-turbo libjpeg62-turbo-dev libwebp6 libwebp-dev libgomp1 libwebpmux3 libwebpdemux2 ghostscript libxml2-dev libxml2-utils && \
-    # Building libaom
+    # The latest Git tags
     ./git-latest-tag.sh ${LIB_AOM_GIT} ${LIB_AOM_VERSION} && \
+    ./git-latest-tag.sh ${LIB_HEIF_GIT} ${LIB_HEIF_VERSION} && \
+    ./git-latest-tag.sh ${IM_GIT} ${IM_VERSION} && \
+    # Building libaom
     git clone --branch ${LIB_AOM_VERSION} --depth 1 --shallow-submodules --recurse-submodules ${LIB_AOM_GIT} && \
     mkdir build_aom && \
     cd build_aom && \
@@ -33,14 +36,12 @@ RUN apt-get -y update && \
     ldconfig /usr/local/lib && \
     cd .. && \
     # Building libheif
-    ./git-latest-tag.sh ${LIB_HEIF_GIT} ${LIB_HEIF_VERSION} && \
     git clone --branch ${LIB_HEIF_VERSION} --depth 1 --shallow-submodules --recurse-submodules ${LIB_HEIF_GIT} && \
     cd libheif && \
     ./autogen.sh && ./configure && make && make install &&  \
     ldconfig /usr/local/lib && \
     cd .. && \
     # Building ImageMagick
-    ./git-latest-tag.sh ${IM_GIT} ${IM_VERSION} && \
     git clone --branch ${IM_VERSION} --depth 1 --shallow-submodules --recurse-submodules ${IM_GIT} && \
     cd ImageMagick && \
     ./configure --without-magick-plus-plus --disable-docs --disable-static && \
