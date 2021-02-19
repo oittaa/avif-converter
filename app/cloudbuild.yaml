@@ -10,4 +10,4 @@ steps:
             '.'
         ]
 images: ['gcr.io/$PROJECT_ID/avif-converter:latest']
-timeout: 300s
+timeout: 3000s
