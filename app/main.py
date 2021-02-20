@@ -7,6 +7,7 @@ import re
 from base64 import b64encode
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256, sha384
+from io import BytesIO
 from mimetypes import guess_extension
 from pathlib import Path
 from subprocess import CalledProcessError, run
@@ -48,18 +49,19 @@ class Cache(object):  # pragma: no cover
     """Cache with Google Cloud Storage"""
 
     def __init__(self, bucket_name, default_timeout=43200):
-        self.bucket = bucket_name
+        self.bucket = None
         self.cache = {}
         self.default_timeout = default_timeout
-        if self.bucket is not None:
+        if bucket_name is not None:
             self.client = storage.Client()
             self.bucket = self.client.bucket(bucket_name)
 
     def get(self, key):
-        if key in self.cache:
-            return self.cache[key]
         if self.bucket is None:
             return None
+
+        if key in self.cache:
+            return self.cache[key]
         blob = self.bucket.blob(key)
         try:
             value = blob.download_as_bytes()
@@ -73,6 +75,7 @@ class Cache(object):  # pragma: no cover
     def set(self, key, value, timeout=None):
         if self.bucket is None:
             return False
+
         blob = self.bucket.blob(key)
         if timeout is None:
             timeout = self.default_timeout
@@ -86,7 +89,10 @@ class Cache(object):  # pragma: no cover
 
     def has(self, key):
         if self.bucket is None:
-            return None
+            return False
+
+        if key in self.cache:
+            return True
         return storage.Blob(bucket=self.bucket, name=key).exists(self.client)
 
 
@@ -195,13 +201,10 @@ def avif_get(image):
     if not match:
         abort(404)
     data_hash = match.group(0)
-    value = cache.get(data_hash)
-    if value is None:
+    image_bytes = cache.get(data_hash)
+    if image_bytes is None:
         abort(404)
-    with NamedTemporaryFile() as tempf:
-        tempf.write(value)
-        tempf.flush()
-        return send_avif(tempf.name)
+    return send_avif(image_bytes)
 
 
 def avif_convert(tempf_in, url_hash=None):
@@ -218,54 +221,44 @@ def avif_convert(tempf_in, url_hash=None):
         return redirect(url_for("avif_get", image=data_hash))
     else:
         logging.info("Cache miss data: %s/%s", GCP_BUCKET, data_hash)
-    with NamedTemporaryFile(suffix=".avif") as tempf:
-        tempf_out = tempf.name
-        try:
-            result = run(
-                ["identify", "-format", "%[magick]", tempf_in],
-                capture_output=True,
-                check=True,
-                text=True,
-            )
-            mime = result.stdout
-        except CalledProcessError:
-            mime = ""
-        if mime == "AVIF":
-            logging.info("Using original AVIF")
-            tempf_out = tempf_in
-            with open(tempf_out, "rb") as image:
-                image_data = image.read()
-        else:
+
+    mime, _error = _run(["identify", "-format", "%[magick]", tempf_in])
+    if mime == "AVIF":
+        logging.info("Using original AVIF")
+        with open(tempf_in, "rb") as image:
+            image_bytes = image.read()
+    else:
+        with NamedTemporaryFile(suffix=".avif") as tempf:
+            tempf_out = tempf.name
             logging.info("Converting %s to AVIF", mime)
             start = perf_counter()
-            try:
-                result = run(
-                    ["convert", tempf_in + "[0]", "avif:" + tempf_out], check=True
-                )
-            except CalledProcessError:
+            _result, error = _run(["convert", tempf_in + "[0]", "avif:" + tempf_out])
+            if error:
                 logging.error("Could not convert %s to AVIF", mime)
                 abort(400)
             logging.info("Encoding time: %.4f", perf_counter() - start)
             logging.info("Output file size: %d", os.path.getsize(tempf_out))
-            image_data = tempf.read()
+            image_bytes = tempf.read()
 
-        if cache.set(data_hash, image_data):
-            if url_hash is not None:
-                logging.info(
-                    "Setting cache URL hash: %s/%s -> %s",
-                    GCP_BUCKET,
-                    url_hash,
-                    data_hash,
-                )
-                cache.set(url_hash, data_hash.encode("utf-8"))
-            return redirect(url_for("avif_get", image=data_hash))
-        return send_avif(tempf_out)
+    if cache.set(data_hash, image_bytes):
+        if url_hash is not None:
+            logging.info(
+                "Setting cache URL hash: %s/%s -> %s",
+                GCP_BUCKET,
+                url_hash,
+                data_hash,
+            )
+            cache.set(url_hash, data_hash.encode("utf-8"))
+        return redirect(url_for("avif_get", image=data_hash))
+    return send_avif(image_bytes)
 
 
-def send_avif(file):
+def send_avif(image_bytes):
     """Sends the file with an AVIF MIME type and sets an ETag."""
-    response = send_file(file, mimetype="image/avif", cache_timeout=CACHE_TIMEOUT)
-    response.set_etag(sha256sum(file))
+    response = send_file(
+        BytesIO(image_bytes), mimetype="image/avif", cache_timeout=CACHE_TIMEOUT
+    )
+    response.set_etag(sha256(image_bytes).hexdigest())
     return response
 
 
@@ -313,6 +306,17 @@ def get_image_url_content_type(url, max_size=GET_MAX_SIZE):
     if isinstance(content_length, str) and int(content_length) > max_size:
         abort(406)
     return content_type
+
+
+def _run(args):
+    output = ""
+    error = False
+    try:
+        result = run(args, capture_output=True, check=True, text=True)
+        output = result.stdout
+    except CalledProcessError:
+        error = True
+    return output, error
 
 
 if __name__ == "__main__":  # pragma: no cover
