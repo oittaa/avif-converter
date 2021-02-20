@@ -16,7 +16,9 @@ supported codecs as shared libraries. It will then start a web server attached t
 
 ## Caching with Google Cloud Platform
 
-If you're using the Docker container with [Cloud Run][cloud-run], you can optionally enable caching. This way you don't have to regenerate the same images every time from scratch. [Cloud Storage][cloud-storage] buckets are used as a cache. You can use the following shell script as a template to create a bucket.
+If you're using the Docker container with [Cloud Run][cloud-run], you can optionally enable caching. This way you don't have to regenerate the same images every time from scratch. [Cloud Storage][cloud-storage] buckets are used as a cache. Environment variable `CACHE_TIMEOUT` defines the object timeout in seconds. Zero means the object never expires. The default is 43200.
+
+You can use the following shell script as a template to create a bucket with a lifecycle policy that cleans up expired objects every day.
 
 ```
 #!/bin/sh
@@ -26,7 +28,6 @@ PROJECT_ID="my-project"
 STORAGE_CLASS="STANDARD"
 BUCKET_LOCATION="US-CENTRAL1"
 BUCKET_NAME="my-cache-bucket"
-DELETE_AFTER_DAYS="7"
 
 # https://cloud.google.com/storage/docs/creating-buckets
 
@@ -34,7 +35,18 @@ gsutil mb -p ${PROJECT_ID} -c ${STORAGE_CLASS} -l ${BUCKET_LOCATION} -b on gs://
 
 LIFECYCLE_CONFIG_FILE=$(mktemp --suffix=.json)
 cat > ${LIFECYCLE_CONFIG_FILE} <<EOF
-{"rule": [{"action": {"type": "Delete"}, "condition": {"daysSinceCustomTime": ${DELETE_AFTER_DAYS}}}]}
+{
+   "rule":[
+      {
+         "action":{
+            "type":"Delete"
+         },
+         "condition":{
+            "daysSinceCustomTime":0
+         }
+      }
+   ]
+}
 EOF
 gsutil lifecycle set ${LIFECYCLE_CONFIG_FILE} gs://${BUCKET_NAME}
 rm -- ${LIFECYCLE_CONFIG_FILE}

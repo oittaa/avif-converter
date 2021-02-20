@@ -1,6 +1,7 @@
 #!/bin/sh
 set -e
 coverage run --source=./ --omit=test.py test.py
+coverage report -m
 cd /
 cat > .coveragerc <<EOF
 [paths]

@@ -43,6 +43,55 @@ X_PROTO = int(os.environ.get("X_PROTO", 0))
 # "image/*" are always supported.
 SUPPORTED_MIMES = ["application/octet-stream", "application/pdf"]
 
+
+class Cache(object):  # pragma: no cover
+    """Cache with Google Cloud Storage"""
+
+    def __init__(self, bucket_name, default_timeout=43200):
+        self.bucket = bucket_name
+        self.cache = {}
+        self.default_timeout = default_timeout
+        if self.bucket is not None:
+            self.client = storage.Client()
+            self.bucket = self.client.bucket(bucket_name)
+
+    def get(self, key):
+        if key in self.cache:
+            return self.cache[key]
+        if self.bucket is None:
+            return None
+        blob = self.bucket.blob(key)
+        try:
+            value = blob.download_as_bytes()
+            if len(self.cache) > 300:
+                del self.cache[next(iter(self.cache))]
+            self.cache[key] = value
+            return value
+        except exceptions.NotFound:
+            return None
+
+    def set(self, key, value, timeout=None):
+        if self.bucket is None:
+            return False
+        blob = self.bucket.blob(key)
+        if timeout is None:
+            timeout = self.default_timeout
+        if timeout != 0:
+            blob.custom_time = datetime.datetime.now(
+                datetime.timezone.utc
+            ) + datetime.timedelta(seconds=timeout)
+        blob.upload_from_string(value)
+        if key not in self.cache and len(self.cache) > 300:
+            del self.cache[next(iter(self.cache))]
+        self.cache[key] = value
+        return True
+
+    def has(self, key):
+        if self.bucket is None:
+            return None
+        return storage.Blob(bucket=self.bucket, name=key).exists(self.client)
+
+
 # Change the format of messages logged to Stackdriver
 logging.basicConfig(format="%(message)s", level=logging.INFO)
 
@@ -51,9 +100,7 @@ app = Flask(__name__)
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = CACHE_TIMEOUT
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=X_FOR, x_proto=X_PROTO)
 talisman = Talisman(app, content_security_policy=csp, force_https=FORCE_HTTPS)
-
-if GCP_BUCKET:  # pragma: no cover
-    storage_client = storage.Client()
+cache = Cache(GCP_BUCKET, CACHE_TIMEOUT)
 
 
 @app.route("/favicon.ico")
@@ -97,30 +144,21 @@ def api_get():
     ):
         abort(400)
 
-    if GCP_BUCKET:
-        url_hash = sha256(url.encode("utf-8")).hexdigest()
-        with NamedTemporaryFile() as tempf:
-            try:
-                download_blob(GCP_BUCKET, url_hash, tempf.name)
-                logging.info("Cache hit URL: %s/%s", GCP_BUCKET, url_hash)
-                data_hash = tempf.read()
-                data_hash = data_hash.decode("utf-8")
-                if blob_exists(GCP_BUCKET, data_hash):
-                    return redirect(url_for("avif_get", image=data_hash))
-            except exceptions.NotFound:
-                logging.info("Cache miss URL: %s/%s", GCP_BUCKET, url_hash)
+    url_hash = sha256(url.encode("utf-8")).hexdigest()
+    value = cache.get(url_hash)
+    if value is not None:
+        logging.info("Cache hit URL: %s/%s", GCP_BUCKET, url_hash)
+        data_hash = value.decode("utf-8")
+        if cache.has(data_hash):
+            logging.info("Cache hit data: %s/%s", GCP_BUCKET, data_hash)
+            return redirect(url_for("avif_get", image=data_hash))
+        else:
+            logging.info("Cache miss data: %s/%s", GCP_BUCKET, data_hash)
+    else:
+        logging.info("Cache miss URL: %s/%s", GCP_BUCKET, url_hash)
 
     try:
-        response = requests.head(url, timeout=REMOTE_REQUEST_TIMEOUT)
-        content_type = response.headers.get("Content-Type")
-        if not isinstance(content_type, str) or (
-            not content_type.startswith("image/")
-            and content_type not in SUPPORTED_MIMES
-        ):
-            abort(400)
-        content_length = response.headers.get("Content-Length")
-        if isinstance(content_length, str) and int(content_length) > GET_MAX_SIZE:
-            abort(406)
+        content_type = get_image_url_content_type(url)
         logging.info("Fetching URL: %s", url)
         response = requests.get(url, timeout=REMOTE_REQUEST_TIMEOUT)
     except requests.exceptions.RequestException:
@@ -152,39 +190,35 @@ def api_post():
 @app.route("/<image>", methods=["GET"])
 def avif_get(image):
     """Fetches an image from a cache."""
-    if len(request.args) > 0 or not GCP_BUCKET:
+    if len(request.args) > 0:
         abort(404)
     image_pattern = re.compile(r"^[0-9a-f]{64}.avif$")
     match = re.search(image_pattern, image)
     if not match:
         abort(404)
     data_hash = match.group(0)
+    value = cache.get(data_hash)
+    if value is None:
+        abort(404)
     with NamedTemporaryFile() as tempf:
-        try:
-            download_blob(GCP_BUCKET, data_hash, tempf.name)
-            return send_avif(tempf.name)
-        except exceptions.NotFound:
-            abort(404)
+        tempf.write(value)
+        tempf.flush()
+        return send_avif(tempf.name)
 
 
 def avif_convert(tempf_in, url_hash=None):
     """Convert an image to AVIF. If a cache is available, forwards to 'avif_get' function."""
     logging.info("Input file size: %d", os.path.getsize(tempf_in))
-    if GCP_BUCKET:
-        data_hash = sha256sum(tempf_in) + ".avif"
-        if blob_exists(GCP_BUCKET, data_hash):
-            logging.info("Cache hit data: %s/%s", GCP_BUCKET, data_hash)
-            if url_hash:
-                with NamedTemporaryFile() as tempf:
-                    tempf.write(data_hash.encode("utf-8"))
-                    tempf.flush()
-                    try:
-                        upload_blob(GCP_BUCKET, tempf.name, url_hash)
-                    except exceptions.NotFound:
-                        logging.error(
-                            "Could not update cache: %s/%s", GCP_BUCKET, url_hash
-                        )
-            return redirect(url_for("avif_get", image=data_hash))
+    data_hash = sha256sum(tempf_in) + ".avif"
+    if cache.has(data_hash):
+        logging.info("Cache hit data: %s/%s", GCP_BUCKET, data_hash)
+        if url_hash is not None:
+            logging.info(
+                "Setting cache URL hash: %s/%s -> %s", GCP_BUCKET, url_hash, data_hash
+            )
+            cache.set(url_hash, data_hash.encode("utf-8"))
+        return redirect(url_for("avif_get", image=data_hash))
+    else:
         logging.info("Cache miss data: %s/%s", GCP_BUCKET, data_hash)
     with NamedTemporaryFile(suffix=".avif") as tempf:
         tempf_out = tempf.name
@@ -201,6 +235,8 @@ def avif_convert(tempf_in, url_hash=None):
         if mime == "AVIF":
             logging.info("Using original AVIF")
             tempf_out = tempf_in
+            with open(tempf_out, "rb") as image:
+                image_data = image.read()
         else:
             logging.info("Converting %s to AVIF", mime)
             start = time.perf_counter()
@@ -213,17 +249,18 @@ def avif_convert(tempf_in, url_hash=None):
                 abort(400)
             logging.info("Encoding time: %.4f", time.perf_counter() - start)
             logging.info("Output file size: %d", os.path.getsize(tempf_out))
-        if GCP_BUCKET:
-            try:
-                upload_blob(GCP_BUCKET, tempf_out, data_hash)
-                if url_hash:
-                    with NamedTemporaryFile() as tempf_url:
-                        tempf_url.write(data_hash.encode("utf-8"))
-                        tempf_url.flush()
-                        upload_blob(GCP_BUCKET, tempf_url.name, url_hash)
-                return redirect(url_for("avif_get", image=data_hash))
-            except exceptions.NotFound:
-                logging.error("Could not update cache: %s/%s", GCP_BUCKET, data_hash)
+            image_data = tempf.read()
+
+        if cache.set(data_hash, image_data):
+            if url_hash is not None:
+                logging.info(
+                    "Setting cache URL hash: %s/%s -> %s",
+                    GCP_BUCKET,
+                    url_hash,
+                    data_hash,
+                )
+                cache.set(url_hash, data_hash.encode("utf-8"))
+            return redirect(url_for("avif_get", image=data_hash))
         return send_avif(tempf_out)
 
 
@@ -266,73 +303,18 @@ def get_extension(path, max_length=16):
     return ext
 
 
-def download_blob(
-    bucket_name, source_blob_name, destination_file_name
-):  # pragma: no cover
-    """Downloads a blob from the bucket."""
-    # bucket_name = "your-bucket-name"
-    # source_blob_name = "storage-object-name"
-    # destination_file_name = "local/path/to/file"
-
-    bucket = storage_client.bucket(bucket_name)
-
-    # Construct a client side representation of a blob.
-    # Note `Bucket.blob` differs from `Bucket.get_blob` as it doesn't retrieve
-    # any content from Google Cloud Storage. As we don't need additional data,
-    # using `Bucket.blob` is preferred here.
-    blob = bucket.blob(source_blob_name)
-    blob.download_to_filename(destination_file_name)
-    update_blob_custom_time(bucket_name, source_blob_name)
-    logging.debug("Blob %s downloaded to %s.", source_blob_name, destination_file_name)
-
-
-def upload_blob(
-    bucket_name, source_file_name, destination_blob_name
-):  # pragma: no cover
-    """Uploads a file to the bucket."""
-    # bucket_name = "your-bucket-name"
-    # source_file_name = "local/path/to/file"
-    # destination_blob_name = "storage-object-name"
-
-    now = datetime.datetime.utcnow()
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(destination_blob_name)
-    blob.custom_time = now
-
-    blob.upload_from_filename(source_file_name)
-    logging.debug("File %s uploaded to %s.", source_file_name, destination_blob_name)
-
-
-def update_blob_custom_time(bucket_name, blob_name):  # pragma: no cover
-    """Update a blob's Custom-Time metadata."""
-    # bucket_name = "your-bucket-name"
-    # blob_name = "storage-object-name"
-
-    now = datetime.datetime.utcnow()
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.get_blob(blob_name)
-    blob.custom_time = now
-    try:
-        blob.patch()
-        logging.debug(
-            "The Custom-Time for the blob %s is %s", blob.name, blob.custom_time
-        )
-    except (exceptions.BadRequest, exceptions.Conflict) as error:
-        logging.error(
-            "Could not edit the blob %s - Custom-Time %s - %s",
-            blob.name,
-            blob.custom_time,
-            error,
-        )
-
-
-def blob_exists(bucket_name, blob_name):  # pragma: no cover
-    """Check if a blob exists in a bucket."""
-    # bucket_name = "your-bucket-name"
-    # blob_name = "storage-object-name"
-
-    bucket = storage_client.bucket(bucket_name)
-    return storage.Blob(bucket=bucket, name=blob_name).exists(storage_client)
+def get_image_url_content_type(url, max_size=GET_MAX_SIZE):
+    logging.info("Checking URL: %s", url)
+    response = requests.head(url, timeout=REMOTE_REQUEST_TIMEOUT)
+    content_type = response.headers.get("Content-Type")
+    if not isinstance(content_type, str) or (
+        not content_type.startswith("image/") and content_type not in SUPPORTED_MIMES
+    ):
+        abort(400)
+    content_length = response.headers.get("Content-Length")
+    if isinstance(content_length, str) and int(content_length) > max_size:
+        abort(406)
+    return content_type
 
 
 if __name__ == "__main__":  # pragma: no cover
