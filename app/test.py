@@ -37,8 +37,8 @@ TEST_STRING_SRI = (
 TEST_BASE_URL = "https://www.example.com/"
 
 
-def is_avif(data):
-    """Checks if data is AVIF."""
+def get_mime(data):
+    """Get MIME from image."""
     with NamedTemporaryFile(suffix=".avif") as tempf:
         tempf.write(data)
         result = subprocess.run(
@@ -46,12 +46,7 @@ def is_avif(data):
             capture_output=True,
             text=True,
         )
-        mime = result.stdout
-        if mime == "AVIF":
-            return True
-        else:
-            print("Error: got type {}".format(mime))
-            return False
+        return result.stdout
 
 
 class Cache(object):
@@ -102,11 +97,11 @@ class SmokeTests(unittest.TestCase):
         response = self.app.post("/api", data={"file": open(TEST_LOCAL_PNG, "rb")})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("Content-Type"), "image/avif")
-        self.assertTrue(is_avif(response.data))
+        self.assertEqual(get_mime(response.data), "AVIF")
         response = self.app.post("/api", data={"file": open(TEST_LOCAL_PNG, "rb")})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("Content-Type"), "image/avif")
-        self.assertTrue(is_avif(response.data))
+        self.assertEqual(get_mime(response.data), "AVIF")
 
     @patch("main.cache", Cache())
     def test_api_get(self):
@@ -116,35 +111,35 @@ class SmokeTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("Content-Type"), "image/avif")
-        self.assertTrue(is_avif(response.data))
+        self.assertEqual(get_mime(response.data), "AVIF")
         response = self.app.get(
             "/api?url={}".format(urllib.parse.quote(TEST_NET_GIF)),
             follow_redirects=True,
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("Content-Type"), "image/avif")
-        self.assertTrue(is_avif(response.data))
+        self.assertEqual(get_mime(response.data), "AVIF")
         response = self.app.get(
             "/api?url={}".format(urllib.parse.quote(TEST_NET_PNG_NOEXT, "rb")),
             follow_redirects=True,
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("Content-Type"), "image/avif")
-        self.assertTrue(is_avif(response.data))
+        self.assertEqual(get_mime(response.data), "AVIF")
         response = self.app.get(
             "/api?url={}".format(urllib.parse.quote(TEST_NET_PDF, "rb")),
             follow_redirects=True,
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("Content-Type"), "image/avif")
-        self.assertTrue(is_avif(response.data))
+        self.assertEqual(get_mime(response.data), "AVIF")
         response = self.app.get(
             "/api?url={}".format(urllib.parse.quote(TEST_NET_HEIC, "rb")),
             follow_redirects=True,
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("Content-Type"), "image/avif")
-        self.assertTrue(is_avif(response.data))
+        self.assertEqual(get_mime(response.data), "AVIF")
         response = self.app.get(
             "/api?url={}".format(urllib.parse.quote(TEST_NET_AVIF, "rb")),
             follow_redirects=True,

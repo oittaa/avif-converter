@@ -162,14 +162,16 @@ def api_get():
         logging.info("Cache miss URL: %s/%s", GCP_BUCKET, url_hash)
 
     try:
-        content_type = get_image_url_content_type(url)
+        logging.info("Checking URL: %s", url)
+        response = requests.head(url, timeout=REMOTE_REQUEST_TIMEOUT)
+        validate_url_headers(response.headers)
         logging.info("Fetching URL: %s", url)
         response = requests.get(url, timeout=REMOTE_REQUEST_TIMEOUT)
     except requests.exceptions.RequestException:
         abort(400)
     if response.status_code != requests.codes.ok:  # pragma: no cover
         abort(400)
-    ext = guess_extension(content_type)
+    ext = guess_extension(response.headers.get("Content-Type"))
     if not ext or ext == ".a":
         path = urlparse(url).path
         ext = get_extension(path)
@@ -228,9 +230,9 @@ def avif_convert(tempf_in, url_hash=None):
         with open(tempf_in, "rb") as image:
             image_bytes = image.read()
     else:
+        logging.info("Converting %s to AVIF", mime)
         with NamedTemporaryFile(suffix=".avif") as tempf:
             tempf_out = tempf.name
-            logging.info("Converting %s to AVIF", mime)
             start = perf_counter()
             _result, error = _run(["convert", tempf_in + "[0]", "avif:" + tempf_out])
             if error:
@@ -294,15 +296,14 @@ def get_extension(path, max_length=16):
     return ext
 
 
-def get_image_url_content_type(url, max_size=GET_MAX_SIZE):
-    logging.info("Checking URL: %s", url)
-    response = requests.head(url, timeout=REMOTE_REQUEST_TIMEOUT)
-    content_type = response.headers.get("Content-Type")
+def validate_url_headers(headers, max_size=GET_MAX_SIZE):
+    """Check URL's Content-Type and Content-Length."""
+    content_type = headers.get("Content-Type")
     if not isinstance(content_type, str) or (
         not content_type.startswith("image/") and content_type not in SUPPORTED_MIMES
     ):
         abort(400)
-    content_length = response.headers.get("Content-Length")
+    content_length = headers.get("Content-Length")
     if isinstance(content_length, str) and int(content_length) > max_size:
         abort(406)
     return content_type
