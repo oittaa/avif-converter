@@ -14,6 +14,7 @@ from mimetypes import guess_extension
 from tempfile import NamedTemporaryFile
 from urllib.parse import urljoin, urlparse
 
+import google.cloud.logging
 import requests
 
 from flask import (
@@ -92,8 +93,13 @@ class Cache(object):  # pragma: no cover
         return storage.Blob(bucket=self.bucket, name=key).exists(self.client)
 
 
-# Change the format of messages logged to Stackdriver
-logging.basicConfig(format="%(message)s", level=logging.INFO)
+try:  # pragma: no cover
+    client = google.cloud.logging.Client()
+    client.get_default_handler()
+    client.setup_logging()
+    logging.info("Cloud logger initialized")
+except google.auth.exceptions.DefaultCredentialsError:
+    logging.info("Python logger initialized")
 
 csp = {"default-src": ["'self'", "cdnjs.cloudflare.com"]}
 app = Flask(__name__)
@@ -152,7 +158,7 @@ def api_get():
         if cache.has(data_hash):
             logging.info("Cache hit data: %s/%s", GCP_BUCKET, data_hash)
             return redirect(url_for("avif_get", image=data_hash))
-        else:
+        else:  # pragma: no cover
             logging.info("Cache miss data: %s/%s", GCP_BUCKET, data_hash)
     else:
         logging.info("Cache miss URL: %s/%s", GCP_BUCKET, url_hash)
@@ -163,7 +169,7 @@ def api_get():
         response = requests.get(url, timeout=REMOTE_REQUEST_TIMEOUT)
     except requests.exceptions.RequestException:
         abort(400)
-    if response.status_code != requests.codes.ok:  # pylint: disable=no-member
+    if response.status_code != requests.codes.ok:  # pragma: no cover
         abort(400)
     ext = guess_extension(content_type)
     if not ext or ext == ".a":

@@ -48,8 +48,10 @@ RUN apt-get -y update && \
     make && make install && \
     ldconfig /usr/local/lib && \
     cd .. && \
-    # Python
+    # Python packages
+    python3 -m pip install --upgrade pip && \
     pip3 install -r requirements.txt && \
+    # Cleanup
     apt-get remove --autoremove --purge -y gcc make cmake g++ yasm git autoconf pkg-config build-essential '*-dev' && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf $BUILD_DIR
