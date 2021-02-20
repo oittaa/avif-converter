@@ -1,20 +1,19 @@
 """This app converts images to AV1 Image File Format (AVIF)."""
 
-import datetime
 import logging
 import os
-import pathlib
 import re
-import subprocess
-import time
 
 from base64 import b64encode
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256, sha384
 from mimetypes import guess_extension
+from pathlib import Path
+from subprocess import CalledProcessError, run
 from tempfile import NamedTemporaryFile
+from time import perf_counter
 from urllib.parse import urljoin, urlparse
 
-import google.cloud.logging
 import requests
 
 from flask import (
@@ -78,9 +77,7 @@ class Cache(object):  # pragma: no cover
         if timeout is None:
             timeout = self.default_timeout
         if timeout != 0:
-            blob.custom_time = datetime.datetime.now(
-                datetime.timezone.utc
-            ) + datetime.timedelta(seconds=timeout)
+            blob.custom_time = datetime.now(timezone.utc) + timedelta(seconds=timeout)
         blob.upload_from_string(value)
         if key not in self.cache and len(self.cache) > 300:
             del self.cache[next(iter(self.cache))]
@@ -93,13 +90,8 @@ class Cache(object):  # pragma: no cover
         return storage.Blob(bucket=self.bucket, name=key).exists(self.client)
 
 
-try:  # pragma: no cover
-    client = google.cloud.logging.Client()
-    client.get_default_handler()
-    client.setup_logging()
-    logging.info("Cloud logger initialized")
-except google.auth.exceptions.DefaultCredentialsError:
-    logging.info("Python logger initialized")
+# Change the format of messages logged to Stackdriver
+logging.basicConfig(format="%(message)s", level=logging.INFO)
 
 csp = {"default-src": ["'self'", "cdnjs.cloudflare.com"]}
 app = Flask(__name__)
@@ -229,14 +221,14 @@ def avif_convert(tempf_in, url_hash=None):
     with NamedTemporaryFile(suffix=".avif") as tempf:
         tempf_out = tempf.name
         try:
-            result = subprocess.run(
+            result = run(
                 ["identify", "-format", "%[magick]", tempf_in],
                 capture_output=True,
                 check=True,
                 text=True,
             )
             mime = result.stdout
-        except subprocess.CalledProcessError:
+        except CalledProcessError:
             mime = ""
         if mime == "AVIF":
             logging.info("Using original AVIF")
@@ -245,15 +237,15 @@ def avif_convert(tempf_in, url_hash=None):
                 image_data = image.read()
         else:
             logging.info("Converting %s to AVIF", mime)
-            start = time.perf_counter()
+            start = perf_counter()
             try:
-                result = subprocess.run(
+                result = run(
                     ["convert", tempf_in + "[0]", "avif:" + tempf_out], check=True
                 )
-            except subprocess.CalledProcessError:
+            except CalledProcessError:
                 logging.error("Could not convert %s to AVIF", mime)
                 abort(400)
-            logging.info("Encoding time: %.4f", time.perf_counter() - start)
+            logging.info("Encoding time: %.4f", perf_counter() - start)
             logging.info("Output file size: %d", os.path.getsize(tempf_out))
             image_data = tempf.read()
 
@@ -302,7 +294,7 @@ def hash_sum(filename, hash_func):
 def get_extension(path, max_length=16):
     """Extract an extension from a path without possibly dangerous characters."""
     pattern = re.compile(r"[\W]+")
-    ext = pathlib.Path(path).suffix
+    ext = Path(path).suffix
     ext = pattern.sub("", ext)
     if ext:
         ext = "." + ext[0:max_length]
