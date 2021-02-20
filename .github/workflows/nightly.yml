@@ -26,6 +26,7 @@ jobs:
           push: false
           load: true
           tags: oittaa/avif-converter:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
       - name: Docker container up
         run: docker run -d --rm -p 8080:8080 --env PORT=8080 --name avif-converter oittaa/avif-converter
