@@ -49,8 +49,8 @@ RUN apt-get -y update && \
     ldconfig /usr/local/lib && \
     cd .. && \
     # Python packages
-    python3 -m pip install --upgrade pip && \
-    pip3 install -r requirements.txt && \
+    python3 -m pip install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir -r requirements.txt && \
     # Cleanup
     apt-get remove --autoremove --purge -y gcc make cmake g++ yasm git autoconf pkg-config build-essential '*-dev' && \
     rm -rf /var/lib/apt/lists/* && \
@@ -64,7 +64,7 @@ COPY templates/ ./templates/
 
 FROM src as test
 COPY test.py coverage.sh ./
-RUN pip3 install coverage
+RUN pip3 install --no-cache-dir coverage
 RUN convert identify -list format && \
     ./coverage.sh
 
