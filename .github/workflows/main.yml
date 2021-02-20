@@ -21,8 +21,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
       - uses: psf/black@stable
-        with:
-          black_args: ". --check --diff"
+
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
