@@ -1,4 +1,4 @@
- html{
+html{
     height:90%;
     margin: 0;
     padding: 0
@@ -10,7 +10,7 @@ body{
     margin: 0;
     padding: 0
 }
-h1,h2{
+h1,h2,p{
     text-align:center
 }
 footer{
@@ -20,6 +20,23 @@ footer{
     height:30px;
     width:100%;
     padding-left:10px
+}
+img,picture{
+    display:block;
+    margin-left:auto;
+    margin-right:auto
+}
+input[type=url]{
+    max-width:800px;
+    padding:12px 20px;
+    margin:8px 0;
+    display:inline-block;
+    border:1px solid #ccc;
+    border-radius:4px;
+    box-sizing:border-box
+}
+.maxwidth{
+    max-width:100%;
 }
 .btn{
     background-color:#4169e1;
@@ -92,19 +109,13 @@ footer{
     visibility:visible;
     opacity:1;
 }
-.api-info{
+.info{
     display:none;
     padding-bottom:2em;
     margin:2em
 }
-input[type=url]{
-    max-width:800px;
-    padding:12px 20px;
-    margin:8px 0;
-    display:inline-block;
-    border:1px solid #ccc;
-    border-radius:4px;
-    box-sizing:border-box
+#api{
+    padding-bottom:2em
 }
 #spinner-back, #spinner-front {
   position: fixed;

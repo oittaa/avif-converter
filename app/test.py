@@ -42,7 +42,7 @@ def get_mime(data):
     with NamedTemporaryFile(suffix=".avif") as tempf:
         tempf.write(data)
         result = subprocess.run(
-            ["identify", "-format", "%[magick]", tempf.name],
+            ["magick", "identify", "-format", "%[magick]", tempf.name],
             capture_output=True,
             text=True,
         )
@@ -90,7 +90,19 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(
             response.headers.get("Content-Type"), "image/vnd.microsoft.icon"
         )
+        response = self.app.get("/peafowl.jpg")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("Content-Type"), "image/jpeg")
+        response = self.app.get("/peafowl.avif")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("Content-Type"), "image/avif")
         response = self.app.get("/?test")
+        self.assertEqual(response.status_code, 404)
+        response = self.app.get("/favicon.ico?test")
+        self.assertEqual(response.status_code, 404)
+        response = self.app.get("/peafowl.jpg?test")
+        self.assertEqual(response.status_code, 404)
+        response = self.app.get("/peafowl.avif?test")
         self.assertEqual(response.status_code, 404)
 
     def test_api_post(self):

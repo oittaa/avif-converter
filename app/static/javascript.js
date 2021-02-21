@@ -12,8 +12,8 @@ function delaySubmit(input, delay = 50) {
         }
     }, delay);
 }
-function toggleApiVisibility(input) {
-    var e = document.getElementById('api-info');
+function toggleVisibility(id) {
+    var e = document.getElementById(id);
     if (e.style.display == 'block')
         e.style.display = 'none';
     else
@@ -29,5 +29,16 @@ function hideSpinner(){
 }
 document.getElementById('file').addEventListener('focus', giveOnchangeEvent);
 document.getElementById('url').addEventListener('paste', delaySubmit);
-document.getElementById('api').addEventListener('click', toggleApiVisibility);
+document.getElementById('api').addEventListener('click', function() {
+    toggleVisibility('api-info');
+}, false);
+document.getElementById('why').addEventListener('click', function() {
+    toggleVisibility('why-info');
+}, false);
+document.getElementById('imgjpg').onclick = function() {
+    this.classList.toggle('maxwidth');
+}
+document.getElementById('imgavif').onclick = function() {
+    this.classList.toggle('maxwidth');
+}
 document.getElementById('form2').addEventListener('submit', showSpinner);

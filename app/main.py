@@ -110,10 +110,36 @@ cache = Cache(GCP_BUCKET, CACHE_TIMEOUT)
 @app.route("/favicon.ico")
 def favicon():
     """Sends legacy favicon."""
+    if len(request.args) > 0:
+        abort(404)
     return send_from_directory(
         os.path.join(app.root_path, "static"),
         "favicon.ico",
         mimetype="image/vnd.microsoft.icon",
+    )
+
+
+@app.route("/peafowl.jpg")
+def peafowl_jpg():
+    """Example JPG."""
+    if len(request.args) > 0:
+        abort(404)
+    return send_from_directory(
+        os.path.join(app.root_path, "static"),
+        "peafowl.jpg",
+        mimetype="image/jpeg",
+    )
+
+
+@app.route("/peafowl.avif")
+def peafowl_avif():
+    """Example AVIF."""
+    if len(request.args) > 0:
+        abort(404)
+    return send_from_directory(
+        os.path.join(app.root_path, "static"),
+        "peafowl.avif",
+        mimetype="image/avif",
     )
 
 
@@ -224,7 +250,7 @@ def avif_convert(tempf_in, url_hash=None):
     else:
         logging.info("Cache miss data: %s/%s", GCP_BUCKET, data_hash)
 
-    mime, _error = _run(["identify", "-format", "%[magick]", tempf_in])
+    mime, _error = _run(["magick", "identify", "-format", "%[magick]", tempf_in])
     if mime == "AVIF":
         logging.info("Using original AVIF")
         with open(tempf_in, "rb") as image:
@@ -234,7 +260,7 @@ def avif_convert(tempf_in, url_hash=None):
         with NamedTemporaryFile(suffix=".avif") as tempf:
             tempf_out = tempf.name
             start = perf_counter()
-            _result, error = _run(["convert", tempf_in + "[0]", "avif:" + tempf_out])
+            _result, error = _run(["magick", tempf_in + "[0]", "avif:" + tempf_out])
             if error:
                 logging.error("Could not convert %s to AVIF", mime)
                 abort(400)
