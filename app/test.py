@@ -92,14 +92,10 @@ class SmokeTests(unittest.TestCase):
         )
         response = self.app.get("/peafowl.jpg")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.headers.get("Content-Type"), "image/jpeg"
-        )
+        self.assertEqual(response.headers.get("Content-Type"), "image/jpeg")
         response = self.app.get("/peafowl.avif")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.headers.get("Content-Type"), "image/avif"
-        )
+        self.assertEqual(response.headers.get("Content-Type"), "image/avif")
         response = self.app.get("/?test")
         self.assertEqual(response.status_code, 404)
         response = self.app.get("/favicon.ico?test")
