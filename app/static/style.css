@@ -26,6 +26,15 @@ img,picture{
     margin-left:auto;
     margin-right:auto
 }
+input[type=url]{
+    max-width:800px;
+    padding:12px 20px;
+    margin:8px 0;
+    display:inline-block;
+    border:1px solid #ccc;
+    border-radius:4px;
+    box-sizing:border-box
+}
 .maxwidth{
     max-width:100%;
 }
@@ -100,24 +109,13 @@ img,picture{
     visibility:visible;
     opacity:1;
 }
-.api-info{
+.info{
     display:none;
     padding-bottom:2em;
     margin:2em
 }
-.why-info{
-    display:none;
-    padding-bottom:2em;
-    margin:0em
-}
-input[type=url]{
-    max-width:800px;
-    padding:12px 20px;
-    margin:8px 0;
-    display:inline-block;
-    border:1px solid #ccc;
-    border-radius:4px;
-    box-sizing:border-box
+#api{
+    padding-bottom:2em
 }
 #spinner-back, #spinner-front {
   position: fixed;
