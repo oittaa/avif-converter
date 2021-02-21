@@ -42,7 +42,7 @@ def get_mime(data):
     with NamedTemporaryFile(suffix=".avif") as tempf:
         tempf.write(data)
         result = subprocess.run(
-            ["identify", "-format", "%[magick]", tempf.name],
+            ["magick" "identify", "-format", "%[magick]", tempf.name],
             capture_output=True,
             text=True,
         )

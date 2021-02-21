@@ -1,6 +1,6 @@
 FROM debian:buster-slim as base
 
-ARG IM_VERSION=7.0.10-62
+ARG IM_VERSION=7.0.11-0
 ARG LIB_HEIF_VERSION=v1.11.0
 ARG LIB_AOM_VERSION=v2.0.2
 ARG IM_GIT=https://github.com/ImageMagick/ImageMagick.git
@@ -17,13 +17,13 @@ ENV GUNICORN_THREADS 1
 WORKDIR $BUILD_DIR
 COPY requirements.txt git-latest-tag.sh ./
 RUN apt-get -y update && \
-    apt-get install -y git make gcc pkg-config autoconf g++ python3-pip \
+    apt-get install -y autoconf g++ gcc git make pkg-config python3-pip \
     # libaom
-    yasm cmake \
+    cmake yasm \
     # libheif
-    libde265-0 libde265-dev libjpeg62-turbo libjpeg62-turbo-dev x265 libx265-dev libtool \
+    libde265-0 libde265-dev libjpeg62-turbo libjpeg62-turbo-dev libtool libx265-dev x265 \
     # IM
-    libpng16-16 libpng-dev libjpeg62-turbo libjpeg62-turbo-dev libwebp6 libwebp-dev libgomp1 libwebpmux3 libwebpdemux2 ghostscript libxml2-dev libxml2-utils && \
+    ghostscript libgomp1 libjpeg62-turbo libjpeg62-turbo-dev libpng16-16 libpng-dev libtiff-dev libwebp6 libwebp-dev libwebpdemux2 libwebpmux3 libxml2-dev libxml2-utils && \
     # The latest Git tags
     ./git-latest-tag.sh ${LIB_AOM_GIT} ${LIB_AOM_VERSION} && \
     ./git-latest-tag.sh ${LIB_HEIF_GIT} ${LIB_HEIF_VERSION} && \
@@ -65,7 +65,7 @@ COPY templates/ ./templates/
 FROM src as test
 COPY test.py coverage.sh ./
 RUN pip3 install --no-cache-dir coverage
-RUN convert identify -list format && \
+RUN magick -list format && \
     ./coverage.sh
 
 FROM src as prod
