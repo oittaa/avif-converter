@@ -1,4 +1,4 @@
- html{
+html{
     height:90%;
     margin: 0;
     padding: 0
@@ -10,7 +10,7 @@ body{
     margin: 0;
     padding: 0
 }
-h1,h2{
+h1,h2,p{
     text-align:center
 }
 footer{
@@ -20,6 +20,14 @@ footer{
     height:30px;
     width:100%;
     padding-left:10px
+}
+img,picture{
+    display:block;
+    margin-left:auto;
+    margin-right:auto
+}
+.maxwidth{
+    max-width:100%;
 }
 .btn{
     background-color:#4169e1;
@@ -96,6 +104,11 @@ footer{
     display:none;
     padding-bottom:2em;
     margin:2em
+}
+.why-info{
+    display:none;
+    padding-bottom:2em;
+    margin:0em
 }
 input[type=url]{
     max-width:800px;

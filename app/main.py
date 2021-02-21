@@ -110,10 +110,36 @@ cache = Cache(GCP_BUCKET, CACHE_TIMEOUT)
 @app.route("/favicon.ico")
 def favicon():
     """Sends legacy favicon."""
+    if len(request.args) > 0:
+        abort(404)
     return send_from_directory(
         os.path.join(app.root_path, "static"),
         "favicon.ico",
         mimetype="image/vnd.microsoft.icon",
+    )
+
+
+@app.route("/peafowl.jpg")
+def peafowl_jpg():
+    """Example JPG."""
+    if len(request.args) > 0:
+        abort(404)
+    return send_from_directory(
+        os.path.join(app.root_path, "static"),
+        "peafowl.jpg",
+        mimetype="image/jpeg",
+    )
+
+
+@app.route("/peafowl.avif")
+def peafowl_avif():
+    """Example AVIF."""
+    if len(request.args) > 0:
+        abort(404)
+    return send_from_directory(
+        os.path.join(app.root_path, "static"),
+        "peafowl.avif",
+        mimetype="image/avif",
     )
 
 
