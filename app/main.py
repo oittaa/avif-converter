@@ -212,11 +212,23 @@ def api_post():
     # check if the post request has the file part
     if "file" not in request.files:
         abort(400)
+    quality = request.values.get("quality")
+    if quality is not None:
+        try:
+            quality = int(quality)
+            if quality < 0:
+                quality = "0"
+            elif quality > 100:
+                quality = "100"
+            else:
+                quality = str(quality)
+        except ValueError:
+            quality = None
     file = request.files["file"]
     ext = get_extension(file.filename)
     with NamedTemporaryFile(suffix=ext) as tempf:
         file.save(tempf.name)
-        return avif_convert(tempf.name)
+        return avif_convert(tempf.name, quality=quality)
 
 
 @app.route("/<image>", methods=["GET"])
@@ -235,10 +247,14 @@ def avif_get(image):
     return send_avif(image_bytes)
 
 
-def avif_convert(tempf_in, url_hash=None):
+def avif_convert(tempf_in, url_hash=None, quality=None):
     """Convert an image to AVIF. If a cache is available, forwards to 'avif_get' function."""
     logging.info("Input file size: %d", os.path.getsize(tempf_in))
-    data_hash = sha256sum(tempf_in) + ".avif"
+    data_hash = hash_sum(tempf_in, sha256())
+    if quality is not None:
+        logging.info("Encoding quality: %s", quality)
+        data_hash.update(quality.encode())
+    data_hash = data_hash.hexdigest() + ".avif"
     if cache.has(data_hash):
         logging.info("Cache hit data: %s/%s", GCP_BUCKET, data_hash)
         if url_hash is not None:
@@ -260,7 +276,10 @@ def avif_convert(tempf_in, url_hash=None):
         with NamedTemporaryFile(suffix=".avif") as tempf:
             tempf_out = tempf.name
             start = perf_counter()
-            _result, error = _run(["magick", tempf_in + "[0]", "avif:" + tempf_out])
+            args = ["magick", tempf_in + "[0]"]
+            if quality is not None:
+                args += ["-quality", quality]
+            _result, error = _run(args + ["avif:" + tempf_out])
             if error:
                 logging.error("Could not convert %s to AVIF", mime)
                 abort(400)
@@ -295,11 +314,6 @@ def calculate_sri_on_file(filename):
     hash_digest = hash_sum(filename, sha384()).digest()
     hash_base64 = b64encode(hash_digest).decode()
     return "sha384-{}".format(hash_base64)
-
-
-def sha256sum(filename):
-    """Compute SHA256 message digest from a file and return it in hex format."""
-    return hash_sum(filename, sha256()).hexdigest()
 
 
 def hash_sum(filename, hash_func):

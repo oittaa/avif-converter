@@ -3,7 +3,9 @@ import subprocess
 import unittest
 import urllib
 
-from main import app, calculate_sri_on_file, get_extension, sha256sum
+from hashlib import sha256
+
+from main import app, calculate_sri_on_file, get_extension, hash_sum
 from tempfile import NamedTemporaryFile
 from unittest.mock import patch
 
@@ -23,6 +25,7 @@ TEST_NET_PNG_NOEXT = TEST_NET_URL + "test_png"
 TEST_NET_HEIC = TEST_NET_URL + "test.heic"
 TEST_NET_AVIF = TEST_NET_URL + "test.avif"
 TEST_NET_PDF = TEST_NET_URL + "test.pdf"
+TEST_NET_TIF = TEST_NET_URL + "test.tif"
 TEST_NET_NOT_IMAGE = "https://www.google.com/"
 TEST_NET_TOO_BIG = TEST_NET_URL + "test_50mb.jpg"
 # echo -n "" | openssl dgst -sha384 -binary | openssl base64 -A
@@ -106,14 +109,30 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_api_post(self):
-        response = self.app.post("/api", data={"file": open(TEST_LOCAL_PNG, "rb")})
+        data = {"file": open(TEST_LOCAL_PNG, "rb")}
+        response = self.app.post("/api", data=data)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("Content-Type"), "image/avif")
         self.assertEqual(get_mime(response.data), "AVIF")
-        response = self.app.post("/api", data={"file": open(TEST_LOCAL_PNG, "rb")})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers.get("Content-Type"), "image/avif")
-        self.assertEqual(get_mime(response.data), "AVIF")
+        temp_data = response.data
+        # ImageMagick's default quality is 50. 0 is also "default".
+        quality_list = ["-40", "0", "50", "invalid"]
+        for q in quality_list:
+            data = {"file": open(TEST_LOCAL_PNG, "rb")}
+            response = self.app.post("/api?quality=" + q, data=data)
+            self.assertEqual(temp_data, response.data)
+        prev_len = 0
+        quality_list = ["40", "85", "999999999"]
+        for q in quality_list:
+            data = {"file": open(TEST_LOCAL_PNG, "rb"), "quality": q}
+            response = self.app.post("/api", data=data)
+            current_len = len(response.data)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers.get("Content-Type"), "image/avif")
+            self.assertEqual(get_mime(response.data), "AVIF")
+            self.assertLess(prev_len, current_len)
+            self.assertNotEqual(temp_data, response.data)
+            prev_len = current_len
 
     @patch("main.cache", Cache())
     def test_api_get(self):
@@ -140,6 +159,13 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(get_mime(response.data), "AVIF")
         response = self.app.get(
             "/api?url={}".format(urllib.parse.quote(TEST_NET_PDF, "rb")),
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("Content-Type"), "image/avif")
+        self.assertEqual(get_mime(response.data), "AVIF")
+        response = self.app.get(
+            "/api?url={}".format(urllib.parse.quote(TEST_NET_TIF, "rb")),
             follow_redirects=True,
         )
         self.assertEqual(response.status_code, 200)
@@ -211,10 +237,10 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_sha256sum(self):
-        val1 = sha256sum(TEST_LOCAL_PNG)
+        val1 = hash_sum(TEST_LOCAL_PNG, sha256()).hexdigest()
         self.assertEqual(len(val1), 64)
         self.assertEqual(val1, TEST_LOCAL_PNG_HASH)
-        val2 = sha256sum(__file__)
+        val2 = hash_sum(__file__, sha256()).hexdigest()
         self.assertNotEqual(val1, val2)
 
     def test_get_extension(self):
