@@ -4,11 +4,13 @@ import unittest
 import urllib
 
 from hashlib import sha256
-
-from main import app, calculate_sri_on_file, get_extension, hash_sum
 from tempfile import NamedTemporaryFile
 from unittest.mock import patch
 
+from main import app, calculate_sri_on_file, hash_sum, Cache, CACHE_MEMORY_ITEMS
+from gcp_storage_emulator.server import create_server
+
+TEST_BUCKET = "test"
 TEST_LOCAL_PNG = "static/tux.png"
 # sha256sum static/tux.png | head -c 64
 TEST_LOCAL_PNG_HASH = "4358b1e6137fd60a49ad90d108b73c0116738552d78cf4fceb56a89f044c342f"
@@ -52,23 +54,21 @@ def get_mime(data):
         return result.stdout
 
 
-class Cache(object):
-    """Mock Cache"""
+def _get_storage_client():
+    """Gets a python storage client"""
+    import os
 
-    def __init__(self):
-        self.cache = {}
+    os.environ["STORAGE_EMULATOR_HOST"] = "http://localhost:9023"
 
-    def get(self, key):
-        if key in self.cache:
-            return self.cache[key]
-        return None
+    # Cloud storage uses environment variables to configure api endpoints for
+    # file upload - which is read at module import time
+    from google.cloud import storage
 
-    def set(self, key, value):
-        self.cache[key] = value
-        return True
-
-    def has(self, key):
-        return key in self.cache
+    return storage.Client(
+        project="[PROJECT]",
+        _http=requests.Session(),
+        client_options={"api_endpoint": "http://localhost:9023"},
+    )
 
 
 # https://docs.python.org/3/library/unittest.mock.html#quick-guide
@@ -78,7 +78,6 @@ class Cache(object):
 # bottom up.
 
 
-@patch("main.GCP_BUCKET", "-testing-")
 @patch("main.URL", TEST_BASE_URL)
 class SmokeTests(unittest.TestCase):
     def setUp(self):
@@ -134,7 +133,7 @@ class SmokeTests(unittest.TestCase):
             self.assertNotEqual(temp_data, response.data)
             prev_len = current_len
 
-    @patch("main.cache", Cache())
+    @patch("main.cache", Cache(TEST_BUCKET, _get_storage_client()))
     def test_api_get(self):
         response = self.app.get(
             "/api?url={}".format(urllib.parse.quote(TEST_NET_PNG)),
@@ -270,14 +269,6 @@ class SmokeTests(unittest.TestCase):
         val2 = hash_sum(__file__, sha256()).hexdigest()
         self.assertNotEqual(val1, val2)
 
-    def test_get_extension(self):
-        val = get_extension("/path/to/file.jpg")
-        self.assertEqual(val, ".jpg")
-        val = get_extension("/path/to/.hidden")
-        self.assertEqual(val, "")
-        val = get_extension("file.€avif@£$‚{[]")
-        self.assertEqual(val, ".avif")
-
     def test_sri(self):
         with NamedTemporaryFile() as tempf:
             val1 = calculate_sri_on_file(tempf.name)
@@ -287,6 +278,17 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(val1, EMPTY_FILE_SRI)
         self.assertEqual(val2, TEST_STRING_SRI)
 
+    def test_cache(self):
+        cache = Cache(TEST_BUCKET, _get_storage_client())
+        for i in range(CACHE_MEMORY_ITEMS + 1):
+            cache.set(str(i), "a")
+        self.assertTrue(cache.get("0"), "a")
+
 
 if __name__ == "__main__":
+    server = create_server(
+        "localhost", 9023, in_memory=True, default_bucket=TEST_BUCKET
+    )
+    server.start()
     unittest.main()
+    server.stop()

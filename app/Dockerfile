@@ -64,7 +64,7 @@ COPY templates/ ./templates/
 
 FROM src as test
 COPY test.py coverage.sh ./
-RUN pip3 install --no-cache-dir coverage
+RUN pip3 install --no-cache-dir coverage gcp-storage-emulator
 RUN magick -list format && \
     ./coverage.sh
 

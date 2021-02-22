@@ -8,12 +8,10 @@ from base64 import b64encode
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256, sha384
 from io import BytesIO
-from mimetypes import guess_extension
-from pathlib import Path
 from subprocess import CalledProcessError, run
 from tempfile import NamedTemporaryFile
 from time import perf_counter
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 import requests
 
@@ -31,6 +29,7 @@ from flask_talisman import Talisman
 from google.cloud import storage, exceptions
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+CACHE_MEMORY_ITEMS = int(os.environ.get("CACHE_MEMORY_ITEMS", 200))
 CACHE_TIMEOUT = int(os.environ.get("CACHE_TIMEOUT", 43200))
 DEFAULT_QUALITY = os.environ.get("DEFAULT_QUALITY", "50")
 FORCE_HTTPS = bool(os.environ.get("FORCE_HTTPS", ""))
@@ -46,32 +45,36 @@ X_PROTO = int(os.environ.get("X_PROTO", 0))
 SUPPORTED_MIMES = ["application/octet-stream", "application/pdf"]
 
 
-class Cache(object):  # pragma: no cover
+class Cache(object):
     """Cache with Google Cloud Storage"""
 
-    def __init__(self, bucket_name, default_timeout=43200):
+    def __init__(self, bucket_name, client=None, default_timeout=CACHE_TIMEOUT):
         self.bucket = None
         self.cache = {}
         self.default_timeout = default_timeout
         if bucket_name is not None:
-            self.client = storage.Client()
+            self.client = client or storage.Client()
             self.bucket = self.client.bucket(bucket_name)
 
     def get(self, key):
         if self.bucket is None:
             return None
 
+        value = None
         if key in self.cache:
-            return self.cache[key]
-        blob = self.bucket.blob(key)
-        try:
-            value = blob.download_as_bytes()
-            if len(self.cache) > 300:
-                del self.cache[next(iter(self.cache))]
-            self.cache[key] = value
-            return value
-        except exceptions.NotFound:
-            return None
+            value = self.cache[key]
+        else:
+            blob = self.bucket.blob(key)
+            try:
+                value = blob.download_as_bytes()
+                if len(self.cache) >= CACHE_MEMORY_ITEMS:
+                    del self.cache[next(iter(self.cache))]
+                self.cache[key] = value
+            except exceptions.NotFound:
+                logging.debug("Cache: miss key %r", key)
+                return None
+        logging.debug("Cache: hit key %r", key)
+        return value
 
     def set(self, key, value, timeout=None):
         if self.bucket is None:
@@ -83,18 +86,21 @@ class Cache(object):  # pragma: no cover
         if timeout != 0:
             blob.custom_time = datetime.now(timezone.utc) + timedelta(seconds=timeout)
         blob.upload_from_string(value)
-        if key not in self.cache and len(self.cache) > 300:
-            del self.cache[next(iter(self.cache))]
+        if key not in self.cache and len(self.cache) >= CACHE_MEMORY_ITEMS:
+            del self.cache[next(iter(self.cache))]  # pragma: no cover
         self.cache[key] = value
+        logging.debug("Cache: set key %r", key)
         return True
 
     def has(self, key):
         if self.bucket is None:
-            return False
-
-        if key in self.cache:
-            return True
-        return storage.Blob(bucket=self.bucket, name=key).exists(self.client)
+            result = False
+        elif key in self.cache:
+            result = True
+        else:
+            result = storage.Blob(bucket=self.bucket, name=key).exists(self.client)
+        logging.debug("has key %r -> %s", key, result)
+        return result
 
 
 # Change the format of messages logged to Stackdriver
@@ -105,7 +111,7 @@ app = Flask(__name__)
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = CACHE_TIMEOUT
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=X_FOR, x_proto=X_PROTO)
 talisman = Talisman(app, content_security_policy=csp, force_https=FORCE_HTTPS)
-cache = Cache(GCP_BUCKET, CACHE_TIMEOUT)
+cache = Cache(GCP_BUCKET)
 
 
 @app.route("/favicon.ico")
@@ -188,32 +194,12 @@ def api_get():
     url_hash = url_hash.hexdigest()
     value = cache.get(url_hash)
     if value is not None:
-        logging.info("Cache hit URL: %s/%s", GCP_BUCKET, url_hash)
         data_hash = value.decode("utf-8")
         if cache.has(data_hash):
-            logging.info("Cache hit data: %s/%s", GCP_BUCKET, data_hash)
             return redirect(url_for("avif_get", image=data_hash))
-        else:  # pragma: no cover
-            logging.info("Cache miss data: %s/%s", GCP_BUCKET, data_hash)
-    else:
-        logging.info("Cache miss URL: %s/%s", GCP_BUCKET, url_hash)
-
-    try:
-        logging.info("Checking URL: %s", url)
-        response = requests.head(url, timeout=REMOTE_REQUEST_TIMEOUT)
-        validate_url_headers(response.headers)
-        logging.info("Fetching URL: %s", url)
-        response = requests.get(url, timeout=REMOTE_REQUEST_TIMEOUT)
-    except requests.exceptions.RequestException:
-        abort(400)
-    if response.status_code != requests.codes.ok:  # pragma: no cover
-        abort(400)
-    ext = guess_extension(response.headers.get("Content-Type"))
-    if not ext or ext == ".a":
-        path = urlparse(url).path
-        ext = get_extension(path)
-    with NamedTemporaryFile(suffix=ext) as tempf:
-        tempf.write(response.content)
+    content = get_content_from_url(url)
+    with NamedTemporaryFile() as tempf:
+        tempf.write(content)
         return avif_convert(tempf.name, url_hash, quality)
 
 
@@ -225,8 +211,7 @@ def api_post():
         abort(400)
     quality = validate_quality(request.values.get("quality"))
     file = request.files["file"]
-    ext = get_extension(file.filename)
-    with NamedTemporaryFile(suffix=ext) as tempf:
+    with NamedTemporaryFile() as tempf:
         file.save(tempf.name)
         return avif_convert(tempf.name, quality=quality)
 
@@ -256,16 +241,9 @@ def avif_convert(tempf_in, url_hash=None, quality=None):
         data_hash.update(quality.encode())
     data_hash = data_hash.hexdigest() + ".avif"
     if cache.has(data_hash):
-        logging.info("Cache hit data: %s/%s", GCP_BUCKET, data_hash)
         if url_hash is not None:
-            logging.info(
-                "Setting cache URL hash: %s/%s -> %s", GCP_BUCKET, url_hash, data_hash
-            )
             cache.set(url_hash, data_hash.encode("utf-8"))
         return redirect(url_for("avif_get", image=data_hash))
-    else:
-        logging.info("Cache miss data: %s/%s", GCP_BUCKET, data_hash)
-
     mime, _error = _run(["magick", "identify", "-format", "%[magick]", tempf_in])
     if mime == "AVIF":
         logging.info("Using original AVIF")
@@ -286,15 +264,8 @@ def avif_convert(tempf_in, url_hash=None, quality=None):
             logging.info("Encoding time: %.4f", perf_counter() - start)
             logging.info("Output file size: %d", os.path.getsize(tempf_out))
             image_bytes = tempf.read()
-
     if cache.set(data_hash, image_bytes):
         if url_hash is not None:
-            logging.info(
-                "Setting cache URL hash: %s/%s -> %s",
-                GCP_BUCKET,
-                url_hash,
-                data_hash,
-            )
             cache.set(url_hash, data_hash.encode("utf-8"))
         return redirect(url_for("avif_get", image=data_hash))
     return send_avif(image_bytes)
@@ -326,27 +297,27 @@ def hash_sum(filename, hash_func):
     return hash_func
 
 
-def get_extension(path, max_length=16):
-    """Extract an extension from a path without possibly dangerous characters."""
-    pattern = re.compile(r"[\W]+")
-    ext = Path(path).suffix
-    ext = pattern.sub("", ext)
-    if ext:
-        ext = "." + ext[0:max_length]
-    return ext
-
-
-def validate_url_headers(headers, max_size=GET_MAX_SIZE):
-    """Check URL's Content-Type and Content-Length."""
-    content_type = headers.get("Content-Type")
-    if not isinstance(content_type, str) or (
-        not content_type.startswith("image/") and content_type not in SUPPORTED_MIMES
-    ):
+def get_content_from_url(url):
+    """Download content from URL."""
+    try:
+        logging.info("Checking URL: %s", url)
+        response = requests.head(url, timeout=REMOTE_REQUEST_TIMEOUT)
+        content_type = response.headers.get("Content-Type")
+        if not isinstance(content_type, str) or (
+            not content_type.startswith("image/")
+            and content_type not in SUPPORTED_MIMES
+        ):
+            abort(400)
+        content_length = response.headers.get("Content-Length")
+        if isinstance(content_length, str) and int(content_length) > GET_MAX_SIZE:
+            abort(406)
+        logging.info("Fetching URL: %s", url)
+        response = requests.get(url, timeout=REMOTE_REQUEST_TIMEOUT)
+    except requests.exceptions.RequestException:
         abort(400)
-    content_length = headers.get("Content-Length")
-    if isinstance(content_length, str) and int(content_length) > max_size:
-        abort(406)
-    return content_type
+    if response.status_code != requests.codes.ok:  # pragma: no cover
+        abort(400)
+    return response.content
 
 
 def validate_quality(quality):
