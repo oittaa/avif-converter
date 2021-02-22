@@ -32,6 +32,7 @@ from google.cloud import storage, exceptions
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 CACHE_TIMEOUT = int(os.environ.get("CACHE_TIMEOUT", 43200))
+DEFAULT_QUALITY = os.environ.get("DEFAULT_QUALITY", "50")
 FORCE_HTTPS = bool(os.environ.get("FORCE_HTTPS", ""))
 GCP_BUCKET = os.environ.get("GCP_BUCKET")
 GET_MAX_SIZE = int(os.environ.get("GET_MAX_SIZE", 20 * 1024 * 1024))
@@ -161,11 +162,17 @@ def api_get():
     url_hash = None
 
     url = request.args.get("url")
-    if not isinstance(url, str) or len(request.args) != 1:
+    quality = request.args.get("quality")
+    if (
+        not isinstance(url, str)
+        or len(request.args) != 1
+        and quality is None
+        or len(request.args) != 2
+        and quality is not None
+    ):
         abort(400)
     if not url.startswith("https://") and not url.startswith("http://"):
         abort(400)
-
     # Recursive query
     if (
         url.startswith(url_for("api_get", _external=True))
@@ -173,8 +180,12 @@ def api_get():
         and url.startswith(urljoin(URL, url_for("api_get")))
     ):
         abort(400)
-
-    url_hash = sha256(url.encode("utf-8")).hexdigest()
+    quality = validate_quality(quality)
+    url_hash = sha256(url.encode("utf-8"))
+    if quality is not None:
+        logging.info("URL with encoding quality: %s", quality)
+        url_hash.update(quality.encode())
+    url_hash = url_hash.hexdigest()
     value = cache.get(url_hash)
     if value is not None:
         logging.info("Cache hit URL: %s/%s", GCP_BUCKET, url_hash)
@@ -203,7 +214,7 @@ def api_get():
         ext = get_extension(path)
     with NamedTemporaryFile(suffix=ext) as tempf:
         tempf.write(response.content)
-        return avif_convert(tempf.name, url_hash)
+        return avif_convert(tempf.name, url_hash, quality)
 
 
 @app.route("/api", methods=["POST"])
@@ -212,18 +223,7 @@ def api_post():
     # check if the post request has the file part
     if "file" not in request.files:
         abort(400)
-    quality = request.values.get("quality")
-    if quality is not None:
-        try:
-            quality = int(quality)
-            if quality < 0:
-                quality = "0"
-            elif quality > 100:
-                quality = "100"
-            else:
-                quality = str(quality)
-        except ValueError:
-            quality = None
+    quality = validate_quality(request.values.get("quality"))
     file = request.files["file"]
     ext = get_extension(file.filename)
     with NamedTemporaryFile(suffix=ext) as tempf:
@@ -347,6 +347,22 @@ def validate_url_headers(headers, max_size=GET_MAX_SIZE):
     if isinstance(content_length, str) and int(content_length) > max_size:
         abort(406)
     return content_type
+
+
+def validate_quality(quality):
+    quality = quality or DEFAULT_QUALITY
+    if quality is not None:
+        try:
+            quality = int(quality)
+            if quality < 0:
+                abort(400)
+            elif quality > 100:
+                abort(400)
+            else:
+                quality = str(quality)
+        except ValueError:
+            abort(400)
+    return quality
 
 
 def _run(args):

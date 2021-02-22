@@ -40,14 +40,24 @@
       </div>
       <h1><a href="#why" id="why">Why?</a></h1>
       <div id="why-info" class="info">
-         <h2>High Quality JPG 1840x1228, 3460kB</h2>
-         <img id="imgjpg" class="maxwidth" src="{{ url_for('peafowl_jpg') }}" alt="Peafowl JPG 3460kB" title="Peafowl JPG 3460kB" loading="lazy">
+      <h2>Some of the features that make AVIF potentially better than the competitors:</h2>
+         <ul>
+            <li>AVIF supports High Dynamic Range (HDR), which provides better and brighter images.</li>
+            <li>AVIF supports both lossless and lossy compression.</li>
+            <li>AVIF includes an alpha channel.</li>
+            <li>AVIF provides 8, 10, and 12-bit color depths.</li>
+            <li>AVIF supports 4:2:0, 4:2:2 and 4:4:4 chroma subsampling.</li>
+            <li>AVIF provides the highest compression in a royalty-free format.</li>
+            <li><a href="https://aomedia.org/membership/members/">AVIF has the industry support.</a></li>
+         </ul>
+         <h2>High Quality JPEG 1840x1228, 3460kB</h2>
+         <img id="imgjpg" class="maxwidth" src="{{ url_for('peafowl_jpg') }}" alt="Peafowl JPEG 3460kB" title="Peafowl JPEG 3460kB" loading="lazy">
          <h2>High Quality AVIF 1840x1228, 2044kB</h2>
          <picture>
            <source srcset="{{ url_for('peafowl_avif') }}" type="image/avif">
            <img id="imgavif" class="maxwidth" src="{{ url_for('static', filename='no-avif.png') }}" alt="Peafowl AVIF 2044kB" title="Peafowl AVIF 2044kB" loading="lazy">
          </picture>
-         <p>Source: <a href="https://www.si.edu/object/indian-peafowl:nzp_NZP-20130417-044CPM">Smithsonian's National Zoo & Conservation Biology Institute</a></p>
+         <p>Source image: <a href="https://www.si.edu/object/indian-peafowl:nzp_NZP-20130417-044CPM">Smithsonian's National Zoo & Conservation Biology Institute</a></p>
       </div>
       <h1><a href="#api" id="api">API</a></h1>
       <div id="api-info" class="info">
@@ -73,7 +83,9 @@ api_url = '{{ url_for('api_get', _external=True) }}'
 input_url = '{{ url_for('static', filename='tux.png', _external=True) }}'
 output_file = '/path/to/tux.avif'
 
-r = requests.get(api_url, params={'url': input_url})
+# The GET method has an optional 'quality' parameter that's passed to ImageMagick.
+# The value must be between 0 and 100. 100 is lossless.
+r = requests.get(api_url, params={'quality': 80, 'url': input_url})
 if r.status_code == requests.codes.ok and r.headers.get('Content-Type') == 'image/avif':
     with open(output_file, 'wb') as f:
         f.write(r.content)
