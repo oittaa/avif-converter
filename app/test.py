@@ -116,13 +116,13 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(get_mime(response.data), "AVIF")
         temp_data = response.data
         # ImageMagick's default quality is 50. 0 is also "default".
-        quality_list = ["-40", "0", "50", "invalid"]
+        quality_list = ["0", "50"]
         for q in quality_list:
             data = {"file": open(TEST_LOCAL_PNG, "rb")}
             response = self.app.post("/api?quality=" + q, data=data)
             self.assertEqual(temp_data, response.data)
         prev_len = 0
-        quality_list = ["40", "85", "999999999"]
+        quality_list = ["40", "85", "100"]
         for q in quality_list:
             data = {"file": open(TEST_LOCAL_PNG, "rb"), "quality": q}
             response = self.app.post("/api", data=data)
@@ -200,6 +200,11 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("Content-Type"), "image/avif")
         self.assertEqual(response.data, temp_data)
+        response = self.app.get(
+            "/api?quality=80&url={}".format(urllib.parse.quote(TEST_NET_PNG)),
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
 
     def test_api_invalid_requests(self):
         response = self.app.get(
@@ -235,6 +240,28 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         response = self.app.get("/invalid.avif")
         self.assertEqual(response.status_code, 404)
+        response = self.app.get(
+            "/api?quality=-1&url={}".format(urllib.parse.quote(TEST_NET_PNG)),
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 400)
+        response = self.app.get(
+            "/api?quality=101&url={}".format(urllib.parse.quote(TEST_NET_PNG)),
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 400)
+        response = self.app.get(
+            "/api?quality=test&url={}".format(urllib.parse.quote(TEST_NET_PNG)),
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 400)
+        response = self.app.get(
+            "/api?quality=80&invalid=true&url={}".format(
+                urllib.parse.quote(TEST_NET_PNG)
+            ),
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 400)
 
     def test_sha256sum(self):
         val1 = hash_sum(TEST_LOCAL_PNG, sha256()).hexdigest()
