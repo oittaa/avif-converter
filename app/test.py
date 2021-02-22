@@ -256,7 +256,9 @@ class SmokeTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         response = self.app.get(
-            "/api?quality=80&invalid=true&url={}".format(urllib.parse.quote(TEST_NET_PNG)),
+            "/api?quality=80&invalid=true&url={}".format(
+                urllib.parse.quote(TEST_NET_PNG)
+            ),
             follow_redirects=True,
         )
         self.assertEqual(response.status_code, 400)
