@@ -58,7 +58,9 @@ api_url = '{{ url_for('api_post', _external=True) }}'
 input_file = '/path/to/image.jpg'
 output_file = '/path/to/image.avif'
 
-r = requests.post(api_url, files={'file': open(input_file,'rb')})
+# The POST method has an optional 'quality' parameter that's passed to ImageMagick.
+# The value must be between 0 and 100. 100 is lossless.
+r = requests.post(api_url, data={'quality': 80}, files={'file': open(input_file,'rb')})
 if r.status_code == requests.codes.ok and r.headers.get('Content-Type') == 'image/avif':
     with open(output_file, 'wb') as f:
         f.write(r.content)
