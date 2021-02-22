@@ -281,8 +281,8 @@ class SmokeTests(unittest.TestCase):
     def test_cache(self):
         cache = Cache(TEST_BUCKET, _get_storage_client())
         for i in range(CACHE_MEMORY_ITEMS + 1):
-            cache.set(str(i), "a")
-        self.assertTrue(cache.get("0"), "a")
+            cache.set(str(i), b"a")
+        self.assertEqual(cache.get("0"), b"a")
 
 
 if __name__ == "__main__":
