@@ -87,7 +87,7 @@ class Cache(object):
             blob.custom_time = datetime.now(timezone.utc) + timedelta(seconds=timeout)
         blob.upload_from_string(value)
         if key not in self.cache and len(self.cache) >= CACHE_MEMORY_ITEMS:
-            del self.cache[next(iter(self.cache))]  # pragma: no cover
+            del self.cache[next(iter(self.cache))]
         self.cache[key] = value
         logging.debug("Cache: set key %r", key)
         return True

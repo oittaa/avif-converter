@@ -15,7 +15,7 @@ ENV GUNICORN_WORKERS 8
 ENV GUNICORN_THREADS 1
 
 WORKDIR $BUILD_DIR
-COPY requirements.txt git-latest-tag.sh ./
+COPY git-latest-tag.sh ./
 RUN apt-get -y update && \
     apt-get install -y autoconf g++ gcc git make pkg-config python3-pip \
     # libaom
@@ -47,10 +47,7 @@ RUN apt-get -y update && \
     ./configure --without-magick-plus-plus --disable-docs --disable-static && \
     make && make install && \
     ldconfig /usr/local/lib && \
-    cd .. && \
-    # Python packages
-    python3 -m pip install --no-cache-dir --upgrade pip && \
-    pip3 install --no-cache-dir -r requirements.txt && \
+    cd / && \
     # Cleanup
     apt-get remove --autoremove --purge -y gcc make cmake g++ yasm git autoconf pkg-config build-essential '*-dev' && \
     rm -rf /var/lib/apt/lists/* && \
@@ -58,14 +55,16 @@ RUN apt-get -y update && \
 
 FROM base as src
 WORKDIR $APP_HOME
-COPY main.py ./
+COPY main.py requirements.txt ./
 COPY static/ ./static/
 COPY templates/ ./templates/
+RUN python3 -m pip install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir -r requirements.txt
 
 FROM src as test
-COPY test.py coverage.sh ./
-RUN pip3 install --no-cache-dir coverage gcp-storage-emulator
-RUN magick -list format && \
+COPY test.py coverage.sh requirements-dev.txt ./
+RUN pip3 install --no-cache-dir -r requirements-dev.txt && \
+    magick -list format && \
     ./coverage.sh
 
 FROM src as prod
