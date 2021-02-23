@@ -5,9 +5,10 @@ import urllib
 
 from hashlib import sha256
 from tempfile import NamedTemporaryFile
+from time import sleep
 from unittest.mock import patch
 
-from main import app, calculate_sri_on_file, hash_sum, Cache, CACHE_MEMORY_ITEMS
+from main import app, calculate_sri_on_file, hash_sum, Cache
 from gcp_storage_emulator.server import create_server
 
 TEST_BUCKET = "test"
@@ -133,7 +134,7 @@ class SmokeTests(unittest.TestCase):
             self.assertNotEqual(temp_data, response.data)
             prev_len = current_len
 
-    @patch("main.cache", Cache(TEST_BUCKET, _get_storage_client()))
+    @patch("main.cache", Cache(TEST_BUCKET, client=_get_storage_client()))
     def test_api_get(self):
         response = self.app.get(
             "/api?url={}".format(urllib.parse.quote(TEST_NET_PNG)),
@@ -279,10 +280,15 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(val2, TEST_STRING_SRI)
 
     def test_cache(self):
-        cache = Cache(TEST_BUCKET, _get_storage_client())
-        for i in range(CACHE_MEMORY_ITEMS + 1):
-            cache.set(str(i), b"a")
-        self.assertEqual(cache.get("0"), b"a")
+        cache = Cache(TEST_BUCKET, client=_get_storage_client())
+        for i in range(10):
+            cache.set(str(i), i)
+        for i in range(10):
+            self.assertEqual(cache.get(str(i)), i)
+        cache.set("key", "message", 1)
+        self.assertEqual(cache.get("key"), "message")
+        sleep(3)
+        self.assertEqual(cache.get("key"), None)
 
 
 if __name__ == "__main__":

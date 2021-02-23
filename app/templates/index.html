@@ -1,68 +1,68 @@
 <!DOCTYPE html>
 <html lang="en">
-   <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>{{ title }}</title>
-      <meta property="og:title" content="{{ title }}" />
-      <meta property="og:description" content="Convert images to AVIF. The AV1 Image File Format, or AVIF, is a modern image format, which generally has better compression than WebP, JPEG, PNG and GIF and is designed to supersede them." />
-      <meta property="og:type" content="website" />
-      <meta property="og:url" content="{{ url_for('index', _external=True) }}" />
-      <meta property="og:image" content="{{ url_for('static', filename='tux.png', _external=True) }}" />
-      <link rel="icon" type="image/png" sizes="192x192"  href="{{ url_for('static', filename='favicon-192x192.png') }}" />
-      <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}" />
-      <link rel="icon" type="image/png" sizes="96x96" href="{{ url_for('static', filename='favicon-96x96.png') }}" />
-      <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}" />
-      <meta name="theme-color" content="#2590eb" />
-      <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" />
-      <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?{{ css_sri|urlencode }}" integrity="{{ css_sri }}" />
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" integrity="sha512-HK5fgLBL+xu6dm/Ii3z4xhlSUyZgTT9tuc/hSrtw6uzJOvgRr2a9jyxxT1ely+B+xFAmJKVSTbpM/CuL7qxO8w==" crossorigin="anonymous" />
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" />
-   </head>
-   <body>
-      <div id="spinner-back">
-          <div id="spinner-front"><i class="fas fa-spinner fa-spin fa-3x"></i>
-          </div>
-      </div>
-      <div class="wrapper">
-         <div class="file-upload">
-            <form method="post" id="form1" enctype="multipart/form-data" action="{{ url_for('api_post') }}">
-               <input type="file" name="file" id="file" accept="image/*">
-               <i class="fa fa-arrow-up"></i>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{ title }}</title>
+        <meta property="og:title" content="{{ title }}" />
+        <meta property="og:description" content="Convert images to AVIF. The AV1 Image File Format, or AVIF, is a modern image format, which generally has better compression than WebP, JPEG, PNG and GIF and is designed to supersede them." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="{{ url_for('index', _external=True) }}" />
+        <meta property="og:image" content="{{ url_for('static', filename='tux.png', _external=True) }}" />
+        <link rel="icon" type="image/png" sizes="192x192"  href="{{ url_for('static', filename='favicon-192x192.png') }}" />
+        <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}" />
+        <link rel="icon" type="image/png" sizes="96x96" href="{{ url_for('static', filename='favicon-96x96.png') }}" />
+        <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}" />
+        <meta name="theme-color" content="#2590eb" />
+        <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" />
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?{{ css_sri|urlencode }}" integrity="{{ css_sri }}" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" integrity="sha512-HK5fgLBL+xu6dm/Ii3z4xhlSUyZgTT9tuc/hSrtw6uzJOvgRr2a9jyxxT1ely+B+xFAmJKVSTbpM/CuL7qxO8w==" crossorigin="anonymous" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" />
+    </head>
+    <body>
+        <div id="spinner-back">
+            <div id="spinner-front"><i class="fas fa-spinner fa-spin fa-3x"></i>
+            </div>
+        </div>
+        <div class="wrapper">
+            <div class="file-upload">
+                <form method="post" id="form1" enctype="multipart/form-data" action="{{ url_for('api_post') }}">
+                    <input type="file" name="file" id="file" accept="image/*">
+                    <i class="fa fa-arrow-up"></i>
+                </form>
+            </div>
+        </div>
+        <div class="wrapper">
+            <form method="get" id="form2" action="{{ url_for('api_get') }}">
+                <input autofocus type="url" name="url" id="url" placeholder="https://..." autocomplete="off">
+                <input class="btn" id="btn" type="submit" value="Go">
             </form>
-         </div>
-      </div>
-      <div class="wrapper">
-          <form method="get" id="form2" action="{{ url_for('api_get') }}">
-             <input autofocus type="url" name="url" id="url" placeholder="https://..." autocomplete="off">
-             <input class="btn" id="btn" type="submit" value="Go">
-          </form>
-      </div>
-      <h1><a href="#why" id="why">Why?</a></h1>
-      <div id="why-info" class="info">
-      <h2>Some of the features that make AVIF potentially better than the competitors:</h2>
-         <ul>
-            <li>AVIF supports High Dynamic Range (HDR), which provides better and brighter images.</li>
-            <li>AVIF supports both lossless and lossy compression.</li>
-            <li>AVIF includes an alpha channel.</li>
-            <li>AVIF provides 8, 10, and 12-bit color depths.</li>
-            <li>AVIF supports 4:2:0, 4:2:2 and 4:4:4 chroma subsampling.</li>
-            <li>AVIF provides the highest compression in a royalty-free format.</li>
-            <li><a href="https://aomedia.org/membership/members/">AVIF has the industry support.</a></li>
-         </ul>
-         <h2>High Quality JPEG 1840x1228, 3460kB</h2>
-         <img id="imgjpg" class="maxwidth" src="{{ url_for('peafowl_jpg') }}" alt="Peafowl JPEG 3460kB" title="Peafowl JPEG 3460kB" loading="lazy">
-         <h2>High Quality AVIF 1840x1228, 2044kB</h2>
-         <picture>
-           <source srcset="{{ url_for('peafowl_avif') }}" type="image/avif">
-           <img id="imgavif" class="maxwidth" src="{{ url_for('static', filename='no-avif.png') }}" alt="Peafowl AVIF 2044kB" title="Peafowl AVIF 2044kB" loading="lazy">
-         </picture>
-         <p>Source image: <a href="https://www.si.edu/object/indian-peafowl:nzp_NZP-20130417-044CPM">Smithsonian's National Zoo & Conservation Biology Institute</a></p>
-      </div>
-      <h1><a href="#api" id="api">API</a></h1>
-      <div id="api-info" class="info">
-         <h2>Python</h2>
-         <pre><code class="language-python">import requests
+        </div>
+        <h1><a href="#why" id="why">Why?</a></h1>
+        <div id="why-info" class="info">
+            <h2>Some of the features that make AVIF potentially better than the competitors:</h2>
+            <ul>
+                <li>AVIF supports High Dynamic Range (HDR), which provides better and brighter images.</li>
+                <li>AVIF supports both lossless and lossy compression.</li>
+                <li>AVIF includes an alpha channel.</li>
+                <li>AVIF provides 8, 10, and 12-bit color depths.</li>
+                <li>AVIF supports 4:2:0, 4:2:2 and 4:4:4 chroma subsampling.</li>
+                <li>AVIF provides the highest compression in a royalty-free format.</li>
+                <li><a href="https://aomedia.org/membership/members/">AVIF has the industry support.</a></li>
+            </ul>
+            <h2>High Quality JPEG 1840x1228, 3460kB</h2>
+            <img id="imgjpg" class="maxwidth" src="{{ url_for('peafowl_jpg') }}" alt="Peafowl JPEG 3460kB" title="Peafowl JPEG 3460kB" loading="lazy">
+            <h2>High Quality AVIF 1840x1228, 2044kB</h2>
+            <picture>
+                <source srcset="{{ url_for('peafowl_avif') }}" type="image/avif">
+                <img id="imgavif" class="maxwidth" src="{{ url_for('static', filename='no-avif.png') }}" alt="Peafowl AVIF 2044kB" title="Peafowl AVIF 2044kB" loading="lazy">
+            </picture>
+            <p>Source image: <a href="https://www.si.edu/object/indian-peafowl:nzp_NZP-20130417-044CPM">Smithsonian's National Zoo & Conservation Biology Institute</a></p>
+        </div>
+        <h1><a href="#api" id="api">API</a></h1>
+        <div id="api-info" class="info">
+            <h2>Python</h2>
+            <pre><code class="language-python">import requests
 
 api_url = '{{ url_for('api_post', _external=True) }}'
 input_file = '/path/to/image.jpg'
@@ -76,8 +76,8 @@ if r.status_code == requests.codes.ok and r.headers.get('Content-Type') == 'imag
         f.write(r.content)
 else:
     print('error')</code></pre>
-    <br>
-    <pre><code class="language-python">import requests
+            <br>
+            <pre><code class="language-python">import requests
 
 api_url = '{{ url_for('api_get', _external=True) }}'
 input_url = '{{ url_for('static', filename='tux.png', _external=True) }}'
@@ -91,26 +91,23 @@ if r.status_code == requests.codes.ok and r.headers.get('Content-Type') == 'imag
         f.write(r.content)
 else:
     print('error')</code></pre>
-
-         <h2>Shell</h2>
-         <pre><code class="language-shell">curl --output /path/to/image.avif -L -F "file=@/path/to/image.jpg" {{ url_for('api_post', _external=True) }}</code></pre>
-
-         <h2>HTML</h2>
-         <pre><code class="language-html">&lt;picture&gt;
+            <h2>Shell</h2>
+            <pre><code class="language-shell">curl --output /path/to/image.avif -L -F "file=@/path/to/image.jpg" {{ url_for('api_post', _external=True) }}</code></pre>
+            <h2>HTML</h2>
+            <pre><code class="language-html">&lt;picture&gt;
     &lt;source srcset="{% set img_url = url_for('static', filename='tux.png', _external=True) %}{{ url_for('api_get', url=img_url|safe, _external=True) }}" type="image/avif"&gt;
     &lt;img src="{{ url_for('static', filename='tux.png', _external=True) }}" alt="tux"&gt;
 &lt;/picture&gt;</code></pre>
-    
-      </div>
-      <footer>
-         <div class="tooltip">
-            <i class="fas fa-info-circle"></i>
-            <span class="tooltiptext">Don't upload illegal content. We don't store any user submitted data permanently, but some user submitted content might reside temporarily in a cache.</span>
-         </div>
-         <a href="https://github.com/oittaa/avif-converter"><i class="fab fa-github"></i></a>
-      </footer>
-      <script src="{{ url_for('static', filename='javascript.js') }}?{{ js_sri|urlencode }}" integrity="{{ js_sri }}"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/components/prism-core.min.js" integrity="sha512-xR+IAyN+t9EBIOOJw5m83FTVMDsPd63IhJ3ElP4gmfUFnQlX9+eWGLp3P4t3gIjpo2Z1JzqtW/5cjgn+oru3yQ==" crossorigin="anonymous"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/plugins/autoloader/prism-autoloader.min.js" integrity="sha512-zc7WDnCM3aom2EziyDIRAtQg1mVXLdILE09Bo+aE1xk0AM2c2cVLfSW9NrxE5tKTX44WBY0Z2HClZ05ur9vB6A==" crossorigin="anonymous"></script>
-   </body>
+        </div>
+        <footer>
+            <div class="tooltip">
+                <i class="fas fa-info-circle"></i>
+                <span class="tooltiptext">Don't upload illegal content. We don't store any user submitted data permanently, but some user submitted content might reside temporarily in a cache.</span>
+            </div>
+            <a href="https://github.com/oittaa/avif-converter"><i class="fab fa-github"></i></a>
+        </footer>
+        <script src="{{ url_for('static', filename='javascript.js') }}?{{ js_sri|urlencode }}" integrity="{{ js_sri }}"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/components/prism-core.min.js" integrity="sha512-xR+IAyN+t9EBIOOJw5m83FTVMDsPd63IhJ3ElP4gmfUFnQlX9+eWGLp3P4t3gIjpo2Z1JzqtW/5cjgn+oru3yQ==" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.23.0/plugins/autoloader/prism-autoloader.min.js" integrity="sha512-zc7WDnCM3aom2EziyDIRAtQg1mVXLdILE09Bo+aE1xk0AM2c2cVLfSW9NrxE5tKTX44WBY0Z2HClZ05ur9vB6A==" crossorigin="anonymous"></script>
+    </body>
 </html>
