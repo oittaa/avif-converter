@@ -1,5 +1,6 @@
 """This app converts images to AV1 Image File Format (AVIF)."""
 
+import json
 import logging
 import os
 import re
@@ -26,10 +27,9 @@ from flask import (
     url_for,
 )
 from flask_talisman import Talisman
-from google.cloud import storage, exceptions
+from google.cloud import storage
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-CACHE_MEMORY_ITEMS = int(os.environ.get("CACHE_MEMORY_ITEMS", 200))
 CACHE_TIMEOUT = int(os.environ.get("CACHE_TIMEOUT", 43200))
 DEFAULT_QUALITY = os.environ.get("DEFAULT_QUALITY", "50")
 FORCE_HTTPS = bool(os.environ.get("FORCE_HTTPS", ""))
@@ -48,59 +48,81 @@ SUPPORTED_MIMES = ["application/octet-stream", "application/pdf"]
 class Cache(object):
     """Cache with Google Cloud Storage"""
 
-    def __init__(self, bucket_name, client=None, default_timeout=CACHE_TIMEOUT):
-        self.bucket = None
-        self.cache = {}
+    def __init__(
+        self, bucket_name, key_prefix=None, client=None, default_timeout=CACHE_TIMEOUT
+    ):
+        self.bucket = self.client = None
+        self.key_prefix = key_prefix or ""
         self.default_timeout = default_timeout
         if bucket_name is not None:
             self.client = client or storage.Client()
             self.bucket = self.client.bucket(bucket_name)
 
     def get(self, key):
-        if self.bucket is None:
-            return None
-
-        value = None
-        if key in self.cache:
-            value = self.cache[key]
-        else:
-            blob = self.bucket.blob(key)
-            try:
-                value = blob.download_as_bytes()
-                if len(self.cache) >= CACHE_MEMORY_ITEMS:
-                    del self.cache[next(iter(self.cache))]
-                self.cache[key] = value
-            except exceptions.NotFound:
-                logging.debug("Cache: miss key %r", key)
-                return None
-        logging.debug("Cache: hit key %r", key)
-        return value
+        if self.client:
+            return self._get(key)
+        return None
 
     def set(self, key, value, timeout=None):
-        if self.bucket is None:
-            return False
+        if self.client:
+            return self._set(key, value, timeout)
+        return False
 
-        blob = self.bucket.blob(key)
+    def has(self, key):
+        if self.client:
+            return self._has(key)
+        return False
+
+    def _get(self, key):
+        result = None
+        expired = False
+        hit_or_miss = "miss"
+        full_key = self.key_prefix + key
+        blob = self.bucket.get_blob(full_key)
+        if blob is not None:
+            expired = blob.custom_time and self._now() > blob.custom_time
+            if not expired:
+                hit_or_miss = "hit"
+                result = blob.download_as_bytes()
+                if blob.content_type == "application/json":
+                    result = json.loads(result)
+        expiredstr = "(expired)" if expired else ""
+        logging.debug("get key %r -> %s %s", full_key, hit_or_miss, expiredstr)
+        return result
+
+    def _set(self, key, value, timeout):
+        full_key = self.key_prefix + key
+        content_type = "application/json"
+        try:
+            value = json.dumps(value)
+        except (UnicodeDecodeError, TypeError):
+            content_type = "application/octet-stream"
+        blob = self.bucket.blob(full_key)
         if timeout is None:
             timeout = self.default_timeout
         if timeout != 0:
-            blob.custom_time = datetime.now(timezone.utc) + timedelta(seconds=timeout)
-        blob.upload_from_string(value)
-        if key not in self.cache and len(self.cache) >= CACHE_MEMORY_ITEMS:
-            del self.cache[next(iter(self.cache))]
-        self.cache[key] = value
-        logging.debug("Cache: set key %r", key)
+            # Use 'Custom-Time' for expiry
+            # https://cloud.google.com/storage/docs/metadata#custom-time
+            blob.custom_time = self._now(delta=timeout)
+        blob.upload_from_string(value, content_type=content_type)
+        logging.debug("set key %r", full_key)
         return True
 
-    def has(self, key):
-        if self.bucket is None:
-            result = False
-        elif key in self.cache:
-            result = True
-        else:
-            result = storage.Blob(bucket=self.bucket, name=key).exists(self.client)
-        logging.debug("has key %r -> %s", key, result)
+    def _has(self, key):
+        full_key = self.key_prefix + key
+        result = False
+        expired = False
+        blob = self.bucket.get_blob(full_key)
+        if blob is not None:
+            expired = blob.custom_time and self._now() > blob.custom_time
+            if not expired:
+                result = True
+        expiredstr = "(expired)" if expired else ""
+        logging.debug("has key %r -> %s %s", full_key, result, expiredstr)
         return result
+
+    def _now(self, delta=0):
+        return datetime.now(timezone.utc) + timedelta(seconds=delta)
 
 
 # Change the format of messages logged to Stackdriver
