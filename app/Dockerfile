@@ -7,6 +7,7 @@ ARG IM_GIT=https://github.com/ImageMagick/ImageMagick.git
 ARG LIB_HEIF_GIT=https://github.com/strukturag/libheif.git
 ARG LIB_AOM_GIT=https://aomedia.googlesource.com/aom
 ARG BUILD_DIR=/build
+ARG DEBIAN_FRONTEND=noninteractive
 
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True
@@ -63,8 +64,7 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
 
 FROM src as test
 COPY test.py coverage.sh requirements-dev.txt ./
-RUN pip3 install --no-cache-dir -r requirements-dev.txt && \
-    magick -list format && \
+RUN magick -list format && \
     ./coverage.sh
 
 FROM src as prod
