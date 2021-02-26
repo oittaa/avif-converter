@@ -22,9 +22,9 @@ COPY templates/ ./templates/
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 FROM src as test
-COPY test.py coverage.sh requirements-dev.txt ./
+COPY test.py test.sh requirements-dev.txt ./
 RUN magick -list format && \
-    ./coverage.sh
+    ./test.sh
 
 FROM src as prod
 COPY --from=test ${APP_HOME}/coverage.xml .
