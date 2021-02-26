@@ -11,6 +11,7 @@ ENV GUNICORN_THREADS 1
 RUN apt-get -y update && \
     apt-get -y install python3-pip && \
     python3 -m pip install --no-cache-dir --upgrade pip && \
+    apt-get remove --autoremove --purge -y gcc build-essential '*-dev' && \
     rm -rf /var/lib/apt/lists/*
 
 FROM base as src
@@ -27,4 +28,5 @@ RUN magick -list format && \
 
 FROM src as prod
 COPY --from=test ${APP_HOME}/coverage.xml .
+ENTRYPOINT []
 CMD exec gunicorn --bind :$PORT --workers $GUNICORN_WORKERS --threads $GUNICORN_THREADS --timeout 0 main:app
