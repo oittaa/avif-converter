@@ -10,7 +10,7 @@ fi
 pip3 install --no-cache-dir -r requirements-dev.txt
 if [ "$ARCH" != "x86_64" ]
 then
-    apt-get remove --autoremove --purge -y gcc build-essential python3-dev
+    apt-get remove --autoremove --purge -y gcc build-essential python3-dev '*-dev'
     rm -rf /var/lib/apt/lists/*
 fi
 coverage run --source=./ --omit=test.py test.py
