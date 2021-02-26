@@ -9,8 +9,8 @@ ENV GUNICORN_WORKERS 8
 ENV GUNICORN_THREADS 1
 
 RUN apt-get -y update && \
-    apt-get install python3-pip && \
-    apt-get remove --autoremove --purge -y '*-dev' && \
+    apt-get -y install python3-pip && \
+    python3 -m pip install --no-cache-dir --upgrade pip && \
     rm -rf /var/lib/apt/lists/*
 
 FROM base as src
@@ -18,8 +18,7 @@ WORKDIR $APP_HOME
 COPY main.py requirements.txt ./
 COPY static/ ./static/
 COPY templates/ ./templates/
-RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 FROM src as test
 COPY test.py coverage.sh requirements-dev.txt ./
