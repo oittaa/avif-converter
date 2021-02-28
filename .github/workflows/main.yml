@@ -41,9 +41,9 @@ jobs:
         uses: actions/cache@v2.1.4
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-build-x-${{ github.sha }}
+          key: ${{ runner.os }}-build-x-${{ matrix.arch }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-build-x-
+            ${{ runner.os }}-build-x-${{ matrix.arch }}-
       - name: Build
         uses: docker/build-push-action@v2
         with:
@@ -54,7 +54,15 @@ jobs:
           load: true
           tags: oittaa/avif-converter:latest
           cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
+      -
+        # Temp fix
+        # https://github.com/docker/build-push-action/issues/252
+        # https://github.com/moby/buildkit/issues/1896
+        name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
       - name: Docker container up
         run: docker run -d --rm -p 8080:8080 --env PORT=8080 --name avif-converter oittaa/avif-converter
       - name: Wait 10 seconds
