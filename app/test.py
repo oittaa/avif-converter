@@ -47,6 +47,8 @@ TEST_STRING_SRI = (
 TEST_BASE_URL = "https://www.example.com/"
 
 os.environ["STORAGE_EMULATOR_HOST"] = "http://localhost:9023"
+server = create_server("localhost", 9023, in_memory=True, default_bucket=TEST_BUCKET)
+server.start()
 
 
 def get_mime(data):
@@ -123,9 +125,8 @@ class SmokeTests(unittest.TestCase):
             self.assertNotEqual(temp_data, response.data)
             prev_len = current_len
 
-    @patch("main.cache")
-    def test_api_get(self, mock_cache):
-        mock_cache.side_effect = Cache(bucket=TEST_BUCKET, anonymous=True)
+    @patch("main.cache", Cache(bucket=TEST_BUCKET, anonymous=True))
+    def test_api_get(self):
         response = self.app.get(
             "/api?url={}".format(urllib.parse.quote(TEST_NET_PNG)),
             follow_redirects=True,
@@ -282,9 +283,4 @@ class SmokeTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    server = create_server(
-        "localhost", 9023, in_memory=True, default_bucket=TEST_BUCKET
-    )
-    server.start()
     unittest.main()
-    server.stop()
