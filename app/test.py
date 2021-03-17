@@ -11,7 +11,9 @@ from unittest.mock import patch
 
 from main import app, calculate_sri_on_file, hash_sum
 from gcp_storage_emulator.server import create_server
-from flask_caching.contrib.googlecloudstoragecache import GoogleCloudStorageCache as Cache
+from flask_caching.contrib.googlecloudstoragecache import (
+    GoogleCloudStorageCache as Cache,
+)
 
 TEST_BUCKET = "test"
 TEST_LOCAL_PNG = "static/tux.png"
