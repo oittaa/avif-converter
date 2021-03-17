@@ -1,12 +1,10 @@
 """This app converts images to AV1 Image File Format (AVIF)."""
 
-import json
 import logging
 import os
 import re
 
 from base64 import b64encode
-from datetime import datetime, timedelta, timezone
 from hashlib import sha256, sha384
 from io import BytesIO
 from subprocess import CalledProcessError, run
@@ -26,8 +24,9 @@ from flask import (
     send_from_directory,
     url_for,
 )
+from flask_caching.backends.nullcache import NullCache
+from flask_caching.contrib.googlecloudstoragecache import GoogleCloudStorageCache
 from flask_talisman import Talisman
-from google.cloud import storage
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 CACHE_TIMEOUT = int(os.environ.get("CACHE_TIMEOUT", 43200))
@@ -45,86 +44,6 @@ X_PROTO = int(os.environ.get("X_PROTO", 0))
 SUPPORTED_MIMES = ["application/octet-stream", "application/pdf"]
 
 
-class Cache(object):
-    """Cache with Google Cloud Storage"""
-
-    def __init__(
-        self, bucket_name, key_prefix=None, client=None, default_timeout=CACHE_TIMEOUT
-    ):
-        self.bucket = self.client = None
-        self.key_prefix = key_prefix or ""
-        self.default_timeout = default_timeout
-        if bucket_name is not None:
-            self.client = client or storage.Client()
-            self.bucket = self.client.bucket(bucket_name)
-
-    def get(self, key):
-        if self.client:
-            return self._get(key)
-        return None
-
-    def set(self, key, value, timeout=None):
-        if self.client:
-            return self._set(key, value, timeout)
-        return False
-
-    def has(self, key):
-        if self.client:
-            return self._has(key)
-        return False
-
-    def _get(self, key):
-        result = None
-        expired = False
-        hit_or_miss = "miss"
-        full_key = self.key_prefix + key
-        blob = self.bucket.get_blob(full_key)
-        if blob is not None:
-            expired = blob.custom_time and self._now() > blob.custom_time
-            if not expired:
-                hit_or_miss = "hit"
-                result = blob.download_as_bytes()
-                if blob.content_type == "application/json":
-                    result = json.loads(result)
-        expiredstr = "(expired)" if expired else ""
-        logging.debug("get key %r -> %s %s", full_key, hit_or_miss, expiredstr)
-        return result
-
-    def _set(self, key, value, timeout):
-        full_key = self.key_prefix + key
-        content_type = "application/json"
-        try:
-            value = json.dumps(value)
-        except (UnicodeDecodeError, TypeError):
-            content_type = "application/octet-stream"
-        blob = self.bucket.blob(full_key)
-        if timeout is None:
-            timeout = self.default_timeout
-        if timeout != 0:
-            # Use 'Custom-Time' for expiry
-            # https://cloud.google.com/storage/docs/metadata#custom-time
-            blob.custom_time = self._now(delta=timeout)
-        blob.upload_from_string(value, content_type=content_type)
-        logging.debug("set key %r", full_key)
-        return True
-
-    def _has(self, key):
-        full_key = self.key_prefix + key
-        result = False
-        expired = False
-        blob = self.bucket.get_blob(full_key)
-        if blob is not None:
-            expired = blob.custom_time and self._now() > blob.custom_time
-            if not expired:
-                result = True
-        expiredstr = "(expired)" if expired else ""
-        logging.debug("has key %r -> %s %s", full_key, result, expiredstr)
-        return result
-
-    def _now(self, delta=0):
-        return datetime.now(timezone.utc) + timedelta(seconds=delta)
-
-
 # Change the format of messages logged to Stackdriver
 logging.basicConfig(format="%(message)s", level=logging.INFO)
 
@@ -133,7 +52,9 @@ app = Flask(__name__)
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = CACHE_TIMEOUT
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=X_FOR, x_proto=X_PROTO)
 talisman = Talisman(app, content_security_policy=csp, force_https=FORCE_HTTPS)
-cache = Cache(GCP_BUCKET)
+cache = NullCache()
+if GCP_BUCKET:
+    cache = GoogleCloudStorageCache(bucket=GCP_BUCKET, default_timeout=CACHE_TIMEOUT)
 
 
 @app.route("/favicon.ico")
@@ -286,7 +207,7 @@ def avif_convert(tempf_in, url_hash=None, quality=None):
             logging.info("Encoding time: %.4f", perf_counter() - start)
             logging.info("Output file size: %d", os.path.getsize(tempf_out))
             image_bytes = tempf.read()
-    if cache.set(data_hash, image_bytes):
+    if cache.set(data_hash, image_bytes) and cache.has(data_hash):
         if url_hash is not None:
             cache.set(url_hash, data_hash.encode("utf-8"))
         return redirect(url_for("avif_get", image=data_hash))

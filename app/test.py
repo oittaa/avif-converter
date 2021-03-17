@@ -1,3 +1,4 @@
+import os
 import requests
 import subprocess
 import unittest
@@ -8,8 +9,9 @@ from tempfile import NamedTemporaryFile
 from time import sleep
 from unittest.mock import patch
 
-from main import app, calculate_sri_on_file, hash_sum, Cache
+from main import app, calculate_sri_on_file, hash_sum
 from gcp_storage_emulator.server import create_server
+from flask_caching.contrib.googlecloudstoragecache import GoogleCloudStorageCache as Cache
 
 TEST_BUCKET = "test"
 TEST_LOCAL_PNG = "static/tux.png"
@@ -42,6 +44,8 @@ TEST_STRING_SRI = (
 )
 TEST_BASE_URL = "https://www.example.com/"
 
+os.environ["STORAGE_EMULATOR_HOST"] = "http://localhost:9023"
+
 
 def get_mime(data):
     """Get MIME from image."""
@@ -53,23 +57,6 @@ def get_mime(data):
             text=True,
         )
         return result.stdout
-
-
-def _get_storage_client():
-    """Gets a python storage client"""
-    import os
-
-    os.environ["STORAGE_EMULATOR_HOST"] = "http://localhost:9023"
-
-    # Cloud storage uses environment variables to configure api endpoints for
-    # file upload - which is read at module import time
-    from google.cloud import storage
-
-    return storage.Client(
-        project="[PROJECT]",
-        _http=requests.Session(),
-        client_options={"api_endpoint": "http://localhost:9023"},
-    )
 
 
 # https://docs.python.org/3/library/unittest.mock.html#quick-guide
@@ -134,8 +121,9 @@ class SmokeTests(unittest.TestCase):
             self.assertNotEqual(temp_data, response.data)
             prev_len = current_len
 
-    @patch("main.cache", Cache(TEST_BUCKET, client=_get_storage_client()))
-    def test_api_get(self):
+    @patch("main.cache")
+    def test_api_get(self, mock_cache):
+        mock_cache = Cache(bucket=TEST_BUCKET, anonymous=True)
         response = self.app.get(
             "/api?url={}".format(urllib.parse.quote(TEST_NET_PNG)),
             follow_redirects=True,
@@ -280,7 +268,7 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(val2, TEST_STRING_SRI)
 
     def test_cache(self):
-        cache = Cache(TEST_BUCKET, client=_get_storage_client())
+        cache = Cache(bucket=TEST_BUCKET, anonymous=True)
         for i in range(10):
             cache.set(str(i), i)
         for i in range(10):
