@@ -52,9 +52,11 @@ app = Flask(__name__)
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = CACHE_TIMEOUT
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=X_FOR, x_proto=X_PROTO)
 talisman = Talisman(app, content_security_policy=csp, force_https=FORCE_HTTPS)
-cache = NullCache()
-if GCP_BUCKET:
-    cache = GoogleCloudStorageCache(bucket=GCP_BUCKET, default_timeout=CACHE_TIMEOUT)
+cache = (
+    GoogleCloudStorageCache(bucket=GCP_BUCKET, default_timeout=CACHE_TIMEOUT)
+    if GCP_BUCKET
+    else NullCache()
+)
 
 
 @app.route("/favicon.ico")
