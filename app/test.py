@@ -125,8 +125,17 @@ class SmokeTests(unittest.TestCase):
             self.assertNotEqual(temp_data, response.data)
             prev_len = current_len
 
-    @patch("main.cache", Cache(bucket=TEST_BUCKET, anonymous=True))
     def test_api_get(self):
+        response = self.app.get(
+            "/api?url={}".format(urllib.parse.quote(TEST_NET_PNG)),
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("Content-Type"), "image/avif")
+        self.assertEqual(get_mime(response.data), "AVIF")
+
+    @patch("main.cache", Cache(bucket=TEST_BUCKET, anonymous=True))
+    def test_api_get_with_cache(self):
         response = self.app.get(
             "/api?url={}".format(urllib.parse.quote(TEST_NET_PNG)),
             follow_redirects=True,
