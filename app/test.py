@@ -125,7 +125,7 @@ class SmokeTests(unittest.TestCase):
 
     @patch("main.cache")
     def test_api_get(self, mock_cache):
-        mock_cache = Cache(bucket=TEST_BUCKET, anonymous=True)
+        mock_cache.side_effect = Cache(bucket=TEST_BUCKET, anonymous=True)
         response = self.app.get(
             "/api?url={}".format(urllib.parse.quote(TEST_NET_PNG)),
             follow_redirects=True,
