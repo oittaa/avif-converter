@@ -285,9 +285,9 @@ class SmokeTests(unittest.TestCase):
             cache.set(str(i), i)
         for i in range(10):
             self.assertEqual(cache.get(str(i)), i)
-        cache.set("key", "message", 1)
+        cache.set("key", "message", 3)
         self.assertEqual(cache.get("key"), "message")
-        sleep(3)
+        sleep(5)
         self.assertEqual(cache.get("key"), None)
 
 
