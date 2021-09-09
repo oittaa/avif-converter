@@ -1,2 +1,2 @@
 coverage==5.5
-gcp-storage-emulator==2021.9.2
+gcp-storage-emulator==2021.9.8
