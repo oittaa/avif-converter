@@ -34,6 +34,7 @@ DEFAULT_QUALITY = os.environ.get("DEFAULT_QUALITY", "50")
 FORCE_HTTPS = bool(os.environ.get("FORCE_HTTPS", ""))
 GCP_BUCKET = os.environ.get("GCP_BUCKET")
 GET_MAX_SIZE = int(os.environ.get("GET_MAX_SIZE", 20 * 1024 * 1024))
+MAX_AGE = int(os.environ.get("MAX_AGE", CACHE_TIMEOUT))
 REMOTE_REQUEST_TIMEOUT = float(os.environ.get("REMOTE_REQUEST_TIMEOUT", 10.0))
 TITLE = os.environ.get("TITLE", "AVIF Converter")
 URL = os.environ.get("URL")
@@ -49,11 +50,11 @@ logging.basicConfig(format="%(message)s", level=logging.INFO)
 
 csp = {"default-src": ["'self'", "cdnjs.cloudflare.com"]}
 app = Flask(__name__)
-app.config["SEND_FILE_MAX_AGE_DEFAULT"] = CACHE_TIMEOUT
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = MAX_AGE
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=X_FOR, x_proto=X_PROTO)
 talisman = Talisman(app, content_security_policy=csp, force_https=FORCE_HTTPS)
 cache = (
-    GoogleCloudStorageCache(bucket=GCP_BUCKET, default_timeout=CACHE_TIMEOUT)
+    GoogleCloudStorageCache(bucket=GCP_BUCKET, default_timeout=MAX_AGE)
     if GCP_BUCKET
     else NullCache()
 )
@@ -219,7 +220,7 @@ def avif_convert(tempf_in, url_hash=None, quality=None):
 def send_avif(image_bytes):
     """Sends the file with an AVIF MIME type and sets an ETag."""
     response = send_file(
-        BytesIO(image_bytes), mimetype="image/avif", cache_timeout=CACHE_TIMEOUT
+        BytesIO(image_bytes), mimetype="image/avif", max_age=MAX_AGE
     )
     response.set_etag(sha256(image_bytes).hexdigest())
     return response
