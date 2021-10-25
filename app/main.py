@@ -219,9 +219,7 @@ def avif_convert(tempf_in, url_hash=None, quality=None):
 
 def send_avif(image_bytes):
     """Sends the file with an AVIF MIME type and sets an ETag."""
-    response = send_file(
-        BytesIO(image_bytes), mimetype="image/avif", max_age=MAX_AGE
-    )
+    response = send_file(BytesIO(image_bytes), mimetype="image/avif", max_age=MAX_AGE)
     response.set_etag(sha256(image_bytes).hexdigest())
     return response
 
