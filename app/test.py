@@ -144,7 +144,7 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(get_mime(response.data), "AVIF")
 
     def test_api_get_with_cache(self):
-        with patch("main.cache", Cache(bucket=TEST_BUCKET, anonymous=True)) as cached:
+        with patch("main.cache", Cache(bucket=TEST_BUCKET, anonymous=True)):
             response = self.app.get(
                 "/api?url={}".format(urllib.parse.quote(TEST_NET_PNG)),
                 follow_redirects=True,
