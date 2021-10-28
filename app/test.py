@@ -47,8 +47,6 @@ TEST_STRING_SRI = (
 TEST_BASE_URL = "https://www.example.com/"
 
 os.environ["STORAGE_EMULATOR_HOST"] = "http://localhost:9023"
-server = create_server("localhost", 9023, in_memory=True, default_bucket=TEST_BUCKET)
-server.start()
 
 
 def get_mime(data):
@@ -72,6 +70,17 @@ def get_mime(data):
 
 @patch("main.URL", TEST_BASE_URL)
 class SmokeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._server = create_server(
+            "localhost", 9023, in_memory=True, default_bucket=TEST_BUCKET
+        )
+        cls._server.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._server.stop()
+
     def setUp(self):
         self.app = app.test_client()
         self.assertEqual(app.debug, False)
@@ -134,7 +143,7 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.headers.get("Content-Type"), "image/avif")
         self.assertEqual(get_mime(response.data), "AVIF")
 
-    @patch("main.cache", Cache(bucket=TEST_BUCKET, anonymous=True))
+    #  @patch("main.cache", Cache(bucket=TEST_BUCKET, anonymous=True))
     def test_api_get_with_cache(self):
         response = self.app.get(
             "/api?url={}".format(urllib.parse.quote(TEST_NET_PNG)),
