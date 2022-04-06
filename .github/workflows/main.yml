@@ -80,6 +80,6 @@ jobs:
       - name: Docker container down
         run: docker stop avif-converter
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v2.1.0
+        uses: codecov/codecov-action@v3
         with:
           flags: unittests
