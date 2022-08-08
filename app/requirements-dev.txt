@@ -1,2 +1,2 @@
-coverage==6.4.2
+coverage==6.4.3
 gcp-storage-emulator==2022.6.11
