@@ -193,8 +193,6 @@ class SmokeTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.headers.get("Content-Type"), "image/avif")
             self.assertEqual(get_mime(response.data), "AVIF")
-            # r = requests.get(TEST_NET_AVIF)
-            # self.assertEqual(response.data, r.content)
             response = self.app.get(
                 "/api?url={}".format(urllib.parse.quote(TEST_NET_BMP)),
                 follow_redirects=True,
