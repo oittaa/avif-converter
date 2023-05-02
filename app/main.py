@@ -191,25 +191,20 @@ def avif_convert(tempf_in, url_hash=None, quality=None):
             cache.set(url_hash, data_hash.encode("utf-8"))
         return redirect(url_for("avif_get", image=data_hash))
     mime, _error = _run(["magick", "identify", "-format", "%[magick]", tempf_in])
-    if mime == "AVIF":
-        logging.info("Using original AVIF")
-        with open(tempf_in, "rb") as image:
-            image_bytes = image.read()
-    else:
-        logging.info("Converting %s to AVIF", mime)
-        with NamedTemporaryFile(suffix=".avif") as tempf:
-            tempf_out = tempf.name
-            start = perf_counter()
-            args = ["magick", tempf_in + "[0]"]
-            if quality is not None:
-                args += ["-quality", quality]
-            _result, error = _run(args + ["avif:" + tempf_out])
-            if error:
-                logging.error("Could not convert %s to AVIF", mime)
-                abort(400)
-            logging.info("Encoding time: %.4f", perf_counter() - start)
-            logging.info("Output file size: %d", os.path.getsize(tempf_out))
-            image_bytes = tempf.read()
+    logging.info("Converting %s to AVIF", mime)
+    with NamedTemporaryFile(suffix=".avif") as tempf:
+        tempf_out = tempf.name
+        start = perf_counter()
+        args = ["magick", tempf_in + "[0]"]
+        if quality is not None:
+            args += ["-quality", quality]
+        _result, error = _run(args + ["avif:" + tempf_out])
+        if error:
+            logging.error("Could not convert %s to AVIF", mime)
+            abort(400)
+        logging.info("Encoding time: %.4f", perf_counter() - start)
+        logging.info("Output file size: %d", os.path.getsize(tempf_out))
+        image_bytes = tempf.read()
     if cache.set(data_hash, image_bytes) and cache.has(data_hash):
         if url_hash is not None:
             cache.set(url_hash, data_hash.encode("utf-8"))
