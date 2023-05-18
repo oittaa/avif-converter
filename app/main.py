@@ -132,6 +132,9 @@ def api_get():
         and url.startswith(urljoin(URL, url_for("api_get")))
     ):
         abort(400)
+    # Request-URI Too Long
+    if len(url) > 2000:
+        abort(414)
     quality = validate_quality(quality)
     url_hash = sha256(url.encode("utf-8"))
     if quality is not None:

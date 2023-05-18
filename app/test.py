@@ -241,6 +241,10 @@ class SmokeTests(unittest.TestCase):
             )
         )
         self.assertEqual(response.status_code, 400)
+        response = self.app.get(
+            "/api?url={}".format(urllib.parse.quote("https://" + "a" * 2000 + ".com"))
+        )
+        self.assertEqual(response.status_code, 414)
         response = self.app.get("/{}.avif".format(TEST_NET_JPG_HASH))
         self.assertEqual(response.status_code, 404)
         response = self.app.get("/{}.avif?invalid".format(TEST_NET_JPG_HASH))
