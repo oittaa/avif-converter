@@ -10,7 +10,6 @@ ENV GUNICORN_THREADS 1
 
 RUN apt-get -y update && \
     apt-get -y install python3-pip && \
-    python3 -m pip install --no-cache-dir --upgrade pip && \
     apt-get remove --autoremove --purge -y gcc build-essential '*-dev' && \
     rm -rf /var/lib/apt/lists/*
 
