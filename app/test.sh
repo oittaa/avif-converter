@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e
-pip3 install --no-cache-dir -r requirements-dev.txt
+pip3 install --no-cache-dir --break-system-packages -r requirements-dev.txt
 coverage run --source=./ --omit=test.py test.py
 coverage report -m
 cd /
