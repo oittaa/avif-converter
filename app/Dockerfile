@@ -10,6 +10,7 @@ ENV GUNICORN_THREADS 1
 
 RUN apt-get -y update && \
     apt-get -y install python3-pip && \
+    python3 -m pip install --no-cache-dir --break-system-packages --upgrade pip && \
     apt-get remove --autoremove --purge -y gcc build-essential '*-dev' && \
     rm -rf /var/lib/apt/lists/*
 
@@ -18,7 +19,7 @@ WORKDIR $APP_HOME
 COPY main.py requirements.txt ./
 COPY static/ ./static/
 COPY templates/ ./templates/
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
 FROM src as test
 COPY test.py test.sh requirements-dev.txt ./
