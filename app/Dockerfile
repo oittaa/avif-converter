@@ -1,4 +1,4 @@
-FROM oittaa/imagemagick:7.1.1-23 as base
+FROM oittaa/imagemagick:7.1.1-26 as base
 
 ARG DEBIAN_FRONTEND=noninteractive
 
