@@ -1,4 +1,4 @@
-Flask==3.0.0
+Flask==3.0.2
 Flask-Caching==2.1.0
 flask-talisman==1.1.0
 google-cloud-storage==2.14.0
